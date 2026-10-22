@@ -11,6 +11,11 @@
 
 ---
 
+><p align="center"><em> Project Dedicated to Sriman Narayana</em>
+</p>
+
+---
+
 ## ✦ About
 
 - Android client for [Croc](https://github.com/schollz/croc) file transfers
