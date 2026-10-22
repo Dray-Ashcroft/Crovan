@@ -11,7 +11,7 @@
 
 ---
 
-><p align="center"><em> Project Dedicated to Sriman Narayana</em>
+><p align="center"><em> Project Dedicated to Lord Vishnu</em>
 </p>
 
 ---
