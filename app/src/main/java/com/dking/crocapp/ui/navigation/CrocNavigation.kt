@@ -60,7 +60,7 @@ sealed class CrocDestination(
     )
 
     companion object {
-        /** Send, Quick, Receive appear in the bottom navigation */
-        val bottomNavItems = listOf(Send, Quick, Receive)
+        /** Send and Receive appear in the bottom navigation (Quick hidden for testing; screen code kept) */
+        val bottomNavItems = listOf(Send, Receive)
     }
 }

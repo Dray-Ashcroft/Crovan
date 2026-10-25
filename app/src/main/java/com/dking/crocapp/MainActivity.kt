@@ -330,7 +330,7 @@ fun CrocApp(
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = CrocDestination.Quick.route,
+            startDestination = CrocDestination.Send.route,
             modifier = Modifier.padding(paddingValues),
             // Page-style motion, like swiping between pages of a book:
             //  • tab ↔ tab: both pages slide a full screen width together over
