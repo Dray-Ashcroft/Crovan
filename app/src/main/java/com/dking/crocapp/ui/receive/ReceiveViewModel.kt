@@ -252,6 +252,11 @@ class ReceiveViewModel(application: Application) : AndroidViewModel(application)
         crocProcess.reset()
         currentOutputDir?.deleteRecursively()
         currentOutputDir = null
+        // Don't leave the panel's throwaway code in the normal Receive form
+        // (e.g. after switching back to Meko).
+        _uiState.update {
+            it.copy(codePhrase = it.defaultCodePhrase, activeEngine = CrocEngine.CURRENT)
+        }
     }
 
     /** Manual "New code" button on the panel. */

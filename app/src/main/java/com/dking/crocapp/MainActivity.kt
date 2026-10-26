@@ -364,6 +364,9 @@ fun CrocApp(
             }
         }
     ) { paddingValues ->
+        // Smart panels / big tablets: much weaker GPU per pixel, so page
+        // switches there use a plain slide (no card scale/clip, no alpha).
+        val largeScreen = androidx.compose.ui.platform.LocalConfiguration.current.smallestScreenWidthDp >= 600
         NavHost(
             navController = navController,
             startDestination = CrocDestination.Send.route,
@@ -381,9 +384,11 @@ fun CrocApp(
                 val fromIndex = tabRoutes.indexOf(initialState.destination.route)
                 val toIndex = tabRoutes.indexOf(targetState.destination.route)
                 if (fromIndex >= 0 && toIndex >= 0) {
+                    // Pure slide: an alpha fade makes Android render each whole
+                    // page off-screen every frame, which is the main source of
+                    // jank. The card fill (TabPageCard) already keeps pages solid.
                     val direction = if (toIndex > fromIndex) 1 else -1
-                    slideInHorizontally(pageSpec()) { direction * it } +
-                            fadeIn(pageFloatSpec(), initialAlpha = 0.6f)
+                    slideInHorizontally(pageSpec()) { direction * it }
                 } else {
                     slideInHorizontally(pageSpec()) { it }
                 }
@@ -393,23 +398,28 @@ fun CrocApp(
                 val toIndex = tabRoutes.indexOf(targetState.destination.route)
                 if (fromIndex >= 0 && toIndex >= 0) {
                     val direction = if (toIndex > fromIndex) -1 else 1
-                    slideOutHorizontally(pageSpec()) { direction * it } +
-                            fadeOut(pageFloatSpec(), targetAlpha = 0.6f)
+                    slideOutHorizontally(pageSpec()) { direction * it }
+                } else if (largeScreen) {
+                    slideOutHorizontally(pageSpec()) { -it / 4 }
                 } else {
                     slideOutHorizontally(pageSpec()) { -it / 4 } +
                             fadeOut(pageFloatSpec(), targetAlpha = 0.4f)
                 }
             },
             popEnterTransition = {
-                slideInHorizontally(pageSpec()) { -it / 4 } +
-                        fadeIn(pageFloatSpec(), initialAlpha = 0.4f)
+                if (largeScreen) {
+                    slideInHorizontally(pageSpec()) { -it / 4 }
+                } else {
+                    slideInHorizontally(pageSpec()) { -it / 4 } +
+                            fadeIn(pageFloatSpec(), initialAlpha = 0.4f)
+                }
             },
             popExitTransition = {
                 slideOutHorizontally(pageSpec()) { it }
             }
         ) {
             composable(CrocDestination.Send.route) {
-                TabPageCard {
+                TabPageCard(simple = largeScreen) {
                 SendScreen(
                     viewModel = sendViewModel,
                     onNavigateToGuide = {
@@ -428,7 +438,7 @@ fun CrocApp(
                 }
             }
             composable(CrocDestination.Receive.route) {
-                TabPageCard {
+                TabPageCard(simple = largeScreen) {
                 ReceiveScreen(
                     viewModel = receiveViewModel,
                     onOpenScanner = {
@@ -545,7 +555,16 @@ private val NavPillShape = RoundedCornerShape(32.dp)
  */
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
-private fun AnimatedVisibilityScope.TabPageCard(content: @Composable () -> Unit) {
+private fun AnimatedVisibilityScope.TabPageCard(
+    simple: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    if (simple) {
+        // Large screens: just the slide. Scaling + rounded clipping a whole
+        // panel-sized page every frame is what drops frames there.
+        Box(modifier = Modifier.fillMaxSize()) { content() }
+        return
+    }
     // 0 = settled page, 1 = fully a card (off-screen / just starting to move).
     val cardness = transition.animateFloat(
         transitionSpec = { tween(PAGE_MS, easing = PageEasing) },
