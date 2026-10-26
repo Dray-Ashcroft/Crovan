@@ -514,13 +514,8 @@ fun CrocApp(
                 )
             }
         }
-        // "Meko / Rimas is summoned" pill, above every screen.
-        com.dking.crocapp.ui.components.ModeCalloutHost(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(paddingValues)
-                .padding(top = 72.dp)
-        )
+        // Timer for the "Meko / Rimas is summoned" label shown beside the mode dot.
+        com.dking.crocapp.ui.components.ModeCalloutHost()
         }
     }
 }

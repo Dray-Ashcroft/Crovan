@@ -3,13 +3,14 @@ package com.dking.crocapp.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -75,7 +76,12 @@ fun ModeDot(modifier: Modifier = Modifier) {
     val name = stringResource(if (isRimas) R.string.mode_rimas else R.string.mode_meko)
     val a11y = stringResource(R.string.mode_dot_a11y, name)
 
-    Box(modifier = modifier) {
+    // Remember the last summoned mode so the label keeps its colour while fading out.
+    var lastRimas by remember { mutableStateOf(false) }
+    ModeCallout.summoned?.let { lastRimas = it }
+    val labelColor = if (lastRimas) RimasViolet else MekoGreen
+
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
                 .size(28.dp) // comfortable touch target around a small dot
@@ -102,6 +108,22 @@ fun ModeDot(modifier: Modifier = Modifier) {
             )
         }
 
+        // Quiet inline callout: slides out beside the dot, then fades away.
+        AnimatedVisibility(
+            visible = ModeCallout.summoned != null,
+            enter = fadeIn() + expandHorizontally(expandFrom = Alignment.Start),
+            exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.Start)
+        ) {
+            Text(
+                text = stringResource(
+                    if (lastRimas) R.string.mode_summoned_rimas else R.string.mode_summoned_meko
+                ),
+                color = labelColor,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1
+            )
+        }
     }
 }
 
@@ -126,40 +148,18 @@ object ModeCallout {
     }
 }
 
-/** Draws the callout; place once near the top of the app. */
+/**
+ * Runs the callout timer. The label itself is drawn by [ModeDot] (beside the
+ * title), so the new screen's dot shows it even after the mode switch
+ * changed screens. Place once in the app.
+ */
 @Composable
-fun ModeCalloutHost(modifier: Modifier = Modifier) {
+fun ModeCalloutHost() {
     val key = ModeCallout.key
     LaunchedEffect(key) {
         if (key > 0) {
-            delay(1_800)
+            delay(1_500)
             ModeCallout.hide()
-        }
-    }
-    // Remember the last mode so the pill keeps its colour while fading out.
-    var lastRimas by remember { mutableStateOf(false) }
-    ModeCallout.summoned?.let { lastRimas = it }
-
-    AnimatedVisibility(
-        visible = ModeCallout.summoned != null,
-        modifier = modifier,
-        enter = fadeIn() + scaleIn(initialScale = 0.85f),
-        exit = fadeOut() + scaleOut(targetScale = 0.9f)
-    ) {
-        Surface(
-            shape = RoundedCornerShape(50),
-            color = if (lastRimas) RimasViolet else MekoGreen,
-            shadowElevation = 6.dp
-        ) {
-            Text(
-                text = stringResource(
-                    if (lastRimas) R.string.mode_summoned_rimas else R.string.mode_summoned_meko
-                ),
-                color = Color.White,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
-            )
         }
     }
 }
