@@ -7,6 +7,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,7 +43,6 @@ import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Security
@@ -101,7 +102,8 @@ private const val MAX_VISIBLE_CODES = 6
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel(),
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    onSwitchedToPanel: () -> Unit = {}
 ) {
     val prefs by viewModel.preferences.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -199,12 +201,14 @@ fun SettingsScreen(
                     modifier = Modifier.padding(vertical = 2.dp),
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                 )
-                SwitchSetting(
-                    icon = Icons.Rounded.QrCode2,
-                    label = stringResource(R.string.settings_panel_mode),
-                    description = stringResource(R.string.settings_panel_mode_desc),
-                    checked = prefs.panelMode,
-                    onCheckedChange = { viewModel.updatePanelMode(it) }
+                ModeSelector(
+                    panelMode = prefs.panelMode,
+                    onSelectMeko = { viewModel.updatePanelMode(false) },
+                    onSelectRimas = {
+                        viewModel.updatePanelMode(true)
+                        // Rimas = panel: go straight to Receive with the QR.
+                        onSwitchedToPanel()
+                    }
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 2.dp),
@@ -1236,5 +1240,101 @@ private fun getLocaleDisplayName(code: String): String {
                 "$nativeName ($englishName)"
             }
         }
+    }
+}
+
+
+// ── Mode picker: 🟢 Meko (phone) / 🟣 Rimas (panel) ──
+private val MekoGreen = androidx.compose.ui.graphics.Color(0xFF2EA65A)
+private val RimasViolet = androidx.compose.ui.graphics.Color(0xFF8B5CF6)
+
+@Composable
+private fun ModeSelector(
+    panelMode: Boolean,
+    onSelectMeko: () -> Unit,
+    onSelectRimas: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.settings_mode),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            ModeOption(
+                name = stringResource(R.string.mode_meko),
+                description = stringResource(R.string.mode_meko_desc),
+                dotColor = MekoGreen,
+                selected = !panelMode,
+                onClick = onSelectMeko,
+                modifier = Modifier.weight(1f)
+            )
+            ModeOption(
+                name = stringResource(R.string.mode_rimas),
+                description = stringResource(R.string.mode_rimas_desc),
+                dotColor = RimasViolet,
+                selected = panelMode,
+                onClick = onSelectRimas,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ModeOption(
+    name: String,
+    description: String,
+    dotColor: androidx.compose.ui.graphics.Color,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .then(
+                if (selected) Modifier.background(dotColor.copy(alpha = 0.14f), shape)
+                else Modifier
+            )
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) dotColor else MaterialTheme.colorScheme.outlineVariant,
+                shape = shape
+            )
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = "🐊", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            androidx.compose.foundation.layout.Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(dotColor, androidx.compose.foundation.shape.CircleShape)
+            )
+        }
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

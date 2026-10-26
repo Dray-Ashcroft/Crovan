@@ -550,4 +550,9 @@
     <string name="panel_new_code_now">New code</string>
     <string name="panel_last_received">Last received</string>
     <string name="send_scan_qr">Scan QR</string>
+    <string name="settings_mode">Mode</string>
+    <string name="mode_meko">Meko</string>
+    <string name="mode_rimas">Rimas</string>
+    <string name="mode_meko_desc">Phone · Send and Receive</string>
+    <string name="mode_rimas_desc">Panel · waits in Receive with a QR code</string>
 </resources>

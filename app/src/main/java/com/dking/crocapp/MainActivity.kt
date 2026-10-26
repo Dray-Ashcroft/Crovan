@@ -464,6 +464,16 @@ fun CrocApp(
                     viewModel = settingsViewModel,
                     onNavigateBack = {
                         navController.popBackStack()
+                    },
+                    onSwitchedToPanel = {
+                        // Rimas picked: jump straight to the panel's QR screen.
+                        navController.navigate(CrocDestination.Receive.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 )
             }
