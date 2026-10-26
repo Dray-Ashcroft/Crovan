@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Kroc-Sauria</string>
+    <string name="app_name">Crovan</string>
 
     <!-- ════ Common / General ════ -->
     <string name="action_cancel">Cancel</string>
@@ -564,5 +564,5 @@
     <string name="mode_dot_a11y">Mode: %1$s. Hold to switch.</string>
     <string name="mode_summoned_meko">🐊 Meko is summoned</string>
     <string name="mode_summoned_rimas">🐊 Rimas is summoned</string>
-    <string name="settings_header_mode">Krok : %1$s Mode</string>
+    <string name="settings_header_mode">Crovan : %1$s Mode</string>
 </resources>
