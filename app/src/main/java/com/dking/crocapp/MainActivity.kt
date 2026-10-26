@@ -513,8 +513,9 @@ fun CrocApp(
                 // Scan a panel's QR: fill its code, then the user picks files and sends.
                 QrScannerScreen(
                     onCodeScanned = { code ->
+                        // The scanner screen navigates back by itself after a scan;
+                        // popping here too would skip past Send.
                         sendViewModel.useScannedCode(code)
-                        navController.popBackStack()
                     },
                     onNavigateBack = {
                         navController.popBackStack()
