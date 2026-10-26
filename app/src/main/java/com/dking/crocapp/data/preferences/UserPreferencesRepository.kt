@@ -47,6 +47,7 @@ class UserPreferencesRepository(private val context: Context) {
         val DEFAULT_STORE_DOWNLOADS = intPreferencesKey("default_store_downloads")
         val CUSTOM_STORE_URL = stringPreferencesKey("custom_store_url")
         val TRANSFER_TRANSPORT = stringPreferencesKey("transfer_transport")
+        val PANEL_MODE = booleanPreferencesKey("panel_mode")
     }
 
     data class CrocPreferences(
@@ -79,7 +80,9 @@ class UserPreferencesRepository(private val context: Context) {
         val defaultStoreExpiration: String = "1d",
         val defaultStoreDownloads: Int = 1,
         val customStoreUrl: String = "",
-        val transferTransport: String = "auto"
+        val transferTransport: String = "auto",
+        /** Smart-panel mode: open on Receive with a self-refreshing QR code. */
+        val panelMode: Boolean = false
     ) {
         /** Effective Quick Send code: explicit quick code → defaultCodePhrase → empty */
         val effectiveQuickSendCode: String
@@ -150,7 +153,8 @@ class UserPreferencesRepository(private val context: Context) {
             defaultStoreExpiration = prefs[DEFAULT_STORE_EXPIRATION] ?: "1d",
             defaultStoreDownloads = prefs[DEFAULT_STORE_DOWNLOADS] ?: 1,
             customStoreUrl = prefs[CUSTOM_STORE_URL] ?: "",
-            transferTransport = prefs[TRANSFER_TRANSPORT] ?: "auto"
+            transferTransport = prefs[TRANSFER_TRANSPORT] ?: "auto",
+            panelMode = prefs[PANEL_MODE] ?: false
         )
     }
 
@@ -164,6 +168,10 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun updatePakeCurve(value: String) {
         context.dataStore.edit { it[PAKE_CURVE] = value }
+    }
+
+    suspend fun updatePanelMode(value: Boolean) {
+        context.dataStore.edit { it[PANEL_MODE] = value }
     }
 
     suspend fun updateForceLocal(value: Boolean) {

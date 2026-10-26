@@ -535,4 +535,19 @@
     <string name="receive_input_code_dialog_title">Enter Secret Code</string>
     <string name="receive_input_code_dialog_desc">Enter the secret code phrase from the sender to start receiving.</string>
     <string name="receive_input_code_save_default">Save as default code phrase</string>
+
+    <!-- Panel mode (smart panels / tablets) -->
+    <string name="settings_panel_mode">Panel mode</string>
+    <string name="settings_panel_mode_desc">Open on Receive with a large QR code that refreshes itself. For smart panels and tablets.</string>
+    <string name="panel_title">Scan to send</string>
+    <string name="panel_subtitle">On your phone: Send → Scan QR → pick a file</string>
+    <string name="panel_code_label">Code</string>
+    <string name="panel_waiting">Waiting for a sender…</string>
+    <string name="panel_connecting">Getting a new code…</string>
+    <string name="panel_received">Received!</string>
+    <string name="panel_reconnecting">Connection lost. Getting a new code…</string>
+    <string name="panel_new_code_in">New code in %1$d min</string>
+    <string name="panel_new_code_now">New code</string>
+    <string name="panel_last_received">Last received</string>
+    <string name="send_scan_qr">Scan QR</string>
 </resources>

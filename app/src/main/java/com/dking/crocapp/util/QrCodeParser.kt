@@ -104,6 +104,23 @@ object QrCodeParser {
      * Web format: https://croc-app.github.io/receive?code=...
      * Allows phone cameras, chat apps (WhatsApp/Telegram/SMS), and browsers to open the app or fallback page directly.
      */
+    /**
+     * Deep link shown by a panel that is waiting to RECEIVE: scanning it should
+     * open the phone's Send screen with this code filled in.
+     */
+    fun sendDeepLink(code: String): String {
+        val encodedCode = try {
+            URLEncoder.encode(code.trim(), "UTF-8")
+        } catch (_: Exception) {
+            code.trim()
+        }
+        return "croc://send?code=$encodedCode"
+    }
+
+    /** True when [input] is a panel's "send to me" link (croc://send?code=…). */
+    fun isSendDeepLink(input: String): Boolean =
+        input.trim().startsWith("croc://send", ignoreCase = true)
+
     fun receiveDeepLink(code: String): String {
         val encodedCode = try {
             URLEncoder.encode(code.trim(), "UTF-8")

@@ -25,6 +25,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun updateRelayAddress(value: String) = viewModelScope.launch { prefsRepo.updateRelayAddress(value) }
     fun updateRelayPassword(value: String) = viewModelScope.launch { prefsRepo.updateRelayPassword(value) }
     fun updatePakeCurve(value: String) = viewModelScope.launch { prefsRepo.updatePakeCurve(value) }
+    fun updatePanelMode(value: Boolean) = viewModelScope.launch { prefsRepo.updatePanelMode(value) }
     fun updateForceLocal(value: Boolean) = viewModelScope.launch { prefsRepo.updateForceLocal(value) }
     fun updateDisableCompression(value: Boolean) = viewModelScope.launch { prefsRepo.updateDisableCompression(value) }
     fun updateUploadThrottle(value: String) = viewModelScope.launch { prefsRepo.updateUploadThrottle(value) }

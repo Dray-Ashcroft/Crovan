@@ -68,6 +68,7 @@ import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.QrCode2
+import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Save
@@ -157,7 +158,8 @@ private const val MAX_VISIBLE_FILES = 6
 fun SendScreen(
     viewModel: SendViewModel = viewModel(),
     onNavigateToHistory: () -> Unit = {},
-    onNavigateToSettings: () -> Unit = {}
+    onNavigateToSettings: () -> Unit = {},
+    onOpenScanner: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -754,6 +756,15 @@ fun SendScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                        // Scan a smart panel's QR to send straight to it.
+                        AssistChip(
+                            onClick = onOpenScanner,
+                            enabled = !isTransferActive,
+                            label = { Text(stringResource(R.string.send_scan_qr)) },
+                            leadingIcon = {
+                                Icon(Icons.Rounded.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                        )
                         AssistChip(
                             onClick = { viewModel.regenerateCode() },
                             enabled = !isTransferActive,

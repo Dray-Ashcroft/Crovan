@@ -41,6 +41,7 @@ import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Security
@@ -193,6 +194,17 @@ fun SettingsScreen(
                     value = prefs.themeMode,
                     options = listOf("system", "light", "dark"),
                     onValueChange = { viewModel.updateThemeMode(it) }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 2.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
+                SwitchSetting(
+                    icon = Icons.Rounded.QrCode2,
+                    label = stringResource(R.string.settings_panel_mode),
+                    description = stringResource(R.string.settings_panel_mode_desc),
+                    checked = prefs.panelMode,
+                    onCheckedChange = { viewModel.updatePanelMode(it) }
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 2.dp),

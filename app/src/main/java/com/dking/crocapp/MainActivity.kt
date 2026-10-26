@@ -86,6 +86,7 @@ import com.dking.crocapp.ui.settings.SettingsViewModel
 import com.dking.crocapp.ui.theme.CrocTheme
 import com.dking.crocapp.util.QrCodeParser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -164,7 +165,12 @@ class MainActivity : AppCompatActivity() {
             Intent.ACTION_VIEW -> {
                 val rawData = intent.data?.toString().orEmpty()
                 val code = QrCodeParser.parseCode(rawData)
-                if (code.isNotEmpty()) SharedContent.ReceiveCode(code) else SharedContent.None
+                when {
+                    code.isEmpty() -> SharedContent.None
+                    // A panel's QR: the panel receives, so this phone sends.
+                    QrCodeParser.isSendDeepLink(rawData) -> SharedContent.SendCode(code)
+                    else -> SharedContent.ReceiveCode(code)
+                }
             }
             else -> SharedContent.None
         }
@@ -176,6 +182,7 @@ sealed class SharedContent {
     data class Files(val uris: List<Uri>) : SharedContent()
     data class Text(val text: String) : SharedContent()
     data class ReceiveCode(val code: String) : SharedContent()
+    data class SendCode(val code: String) : SharedContent()
 }
 
 @Composable
@@ -195,6 +202,26 @@ fun CrocApp(
     val sendViewModel: SendViewModel = viewModel()
     val receiveViewModel: ReceiveViewModel = viewModel()
     val quickViewModel: QuickViewModel = viewModel()
+
+    // Panel mode: open straight on Receive (once per launch, and not when the
+    // app was opened by a share or deep link).
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    var panelStartChecked by rememberSaveable { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (panelStartChecked) return@LaunchedEffect
+        panelStartChecked = true
+        val panelMode = com.dking.crocapp.data.preferences.UserPreferencesRepository(appContext)
+            .preferencesFlow.first().panelMode
+        if (panelMode && sharedContent is SharedContent.None) {
+            navController.navigate(CrocDestination.Receive.route) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
 
     var handledSharedContent by rememberSaveable { mutableStateOf(false) }
     if (sharedContent !is SharedContent.None && !handledSharedContent) {
@@ -217,6 +244,18 @@ fun CrocApp(
                 sendViewModel.setSharedText(sharedContent.text)
                 // Navigate to Send tab in text mode
                 androidx.compose.runtime.LaunchedEffect(Unit) {
+                    navController.navigate(CrocDestination.Send.route) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            }
+            is SharedContent.SendCode -> {
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    sendViewModel.useScannedCode(sharedContent.code)
                     navController.navigate(CrocDestination.Send.route) {
                         popUpTo(navController.graph.findStartDestination().id) {
                             saveState = true
@@ -393,6 +432,9 @@ fun CrocApp(
                 TabPageCard {
                 SendScreen(
                     viewModel = sendViewModel,
+                    onOpenScanner = {
+                        navController.navigate("scanner_send")
+                    },
                     onNavigateToHistory = {
                         navController.navigate(CrocDestination.History.route)
                     },
@@ -461,6 +503,18 @@ fun CrocApp(
                             launchSingleTop = true
                             restoreState = true
                         }
+                    },
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+            composable("scanner_send") {
+                // Scan a panel's QR: fill its code, then the user picks files and sends.
+                QrScannerScreen(
+                    onCodeScanned = { code ->
+                        sendViewModel.useScannedCode(code)
+                        navController.popBackStack()
                     },
                     onNavigateBack = {
                         navController.popBackStack()

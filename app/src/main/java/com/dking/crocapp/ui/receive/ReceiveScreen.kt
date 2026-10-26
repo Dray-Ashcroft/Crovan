@@ -107,6 +107,17 @@ fun ReceiveScreen(
     onNavigateToSettings: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // Smart-panel mode: a big self-refreshing QR instead of the code form.
+    if (uiState.panelMode) {
+        PanelReceiveScreen(
+            viewModel = viewModel,
+            onNavigateToHistory = onNavigateToHistory,
+            onNavigateToSettings = onNavigateToSettings
+        )
+        return
+    }
+
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     var hideCodePhrase by remember { mutableStateOf(true) }
@@ -621,7 +632,7 @@ fun ReceiveScreen(
 }
 
 @Composable
-private fun ReceivedFileRow(
+internal fun ReceivedFileRow(
     file: ReceivedFile,
     onOpen: () -> Unit,
     onShare: () -> Unit
