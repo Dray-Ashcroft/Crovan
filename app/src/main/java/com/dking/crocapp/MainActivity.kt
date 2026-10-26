@@ -73,8 +73,6 @@ import com.dking.crocapp.ui.components.liquidGlass
 import com.dking.crocapp.ui.guide.GuideScreen
 import com.dking.crocapp.ui.history.HistoryScreen
 import com.dking.crocapp.ui.navigation.CrocDestination
-import com.dking.crocapp.ui.quick.QuickScreen
-import com.dking.crocapp.ui.quick.QuickViewModel
 import com.dking.crocapp.ui.receive.ReceiveScreen
 import com.dking.crocapp.ui.receive.ReceiveViewModel
 import com.dking.crocapp.ui.scanner.QrScannerScreen
@@ -201,7 +199,6 @@ fun CrocApp(
 
     val sendViewModel: SendViewModel = viewModel()
     val receiveViewModel: ReceiveViewModel = viewModel()
-    val quickViewModel: QuickViewModel = viewModel()
 
     // Panel mode: open straight on Receive (once per launch, and not when the
     // app was opened by a share or deep link).
@@ -369,7 +366,7 @@ fun CrocApp(
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = CrocDestination.Quick.route,
+            startDestination = CrocDestination.Send.route,
             modifier = Modifier.padding(paddingValues),
             // Page-style motion, like swiping between pages of a book:
             //  • tab ↔ tab: both pages slide a full screen width together over
@@ -411,27 +408,13 @@ fun CrocApp(
                 slideOutHorizontally(pageSpec()) { it }
             }
         ) {
-            composable(CrocDestination.Quick.route) {
-                TabPageCard {
-                QuickScreen(
-                    viewModel = quickViewModel,
-                    onOpenScanner = { onCodeScanned ->
-                        // Store callback and navigate to scanner
-                        navController.navigate("scanner_quick")
-                    },
-                    onNavigateToSettings = {
-                        navController.navigate(CrocDestination.Settings.route)
-                    },
-                    onNavigateToGuide = {
-                        navController.navigate(CrocDestination.Guide.route)
-                    }
-                )
-                }
-            }
             composable(CrocDestination.Send.route) {
                 TabPageCard {
                 SendScreen(
                     viewModel = sendViewModel,
+                    onNavigateToGuide = {
+                        navController.navigate(CrocDestination.Guide.route)
+                    },
                     onOpenScanner = {
                         navController.navigate("scanner_send")
                     },
@@ -516,23 +499,6 @@ fun CrocApp(
                         // The scanner screen navigates back by itself after a scan;
                         // popping here too would skip past Send.
                         sendViewModel.useScannedCode(code)
-                    },
-                    onNavigateBack = {
-                        navController.popBackStack()
-                    }
-                )
-            }
-            composable("scanner_quick") {
-                QrScannerScreen(
-                    onCodeScanned = { code ->
-                        quickViewModel.startReceiveFromQr(code)
-                        navController.navigate(CrocDestination.Quick.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
                     },
                     onNavigateBack = {
                         navController.popBackStack()

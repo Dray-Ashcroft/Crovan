@@ -84,7 +84,6 @@ fun GuideScreen(
             "how_to_use" to true,
             "basics" to false,
             "troubleshooting" to false,
-            "quick" to false,
             "crossplatform" to false
         )
     }
@@ -257,47 +256,6 @@ fun GuideScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp, start = 2.dp, end = 2.dp)
-                )
-            }
-
-            // ═══════════════════════════════════════════════════════════
-            // Section 4: Quick Mode & 1-Tap Transfers
-            // ═══════════════════════════════════════════════════════════
-            GuideSectionContainer(
-                title = stringResource(R.string.guide_sec_quick_title),
-                subtitle = stringResource(R.string.guide_sec_quick_subtitle),
-                icon = Icons.Rounded.FlashOn,
-                isExpanded = expandedSections["quick"] == true,
-                onToggle = { expandedSections["quick"] = !(expandedSections["quick"] ?: false) }
-            ) {
-                GuideItem(
-                    icon = Icons.Rounded.CheckCircle,
-                    title = stringResource(R.string.guide_sec_quick_setup_title),
-                    description = stringResource(R.string.guide_sec_quick_setup_desc)
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                GuideItem(
-                    icon = Icons.Rounded.Info,
-                    title = stringResource(R.string.guide_sec_quick_clipboard_title),
-                    description = stringResource(R.string.guide_sec_quick_clipboard_desc)
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                GuideItem(
-                    icon = Icons.Rounded.QrCodeScanner,
-                    title = stringResource(R.string.guide_sec_quick_qr_title),
-                    description = stringResource(R.string.guide_sec_quick_qr_desc)
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                GuideItem(
-                    icon = Icons.Rounded.FlashOn,
-                    title = stringResource(R.string.guide_sec_quick_auto_code_title),
-                    description = stringResource(R.string.guide_sec_quick_auto_code_desc)
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                GuideItem(
-                    icon = Icons.Rounded.Refresh,
-                    title = stringResource(R.string.guide_sec_quick_retry_title),
-                    description = stringResource(R.string.guide_sec_quick_retry_desc)
                 )
             }
 

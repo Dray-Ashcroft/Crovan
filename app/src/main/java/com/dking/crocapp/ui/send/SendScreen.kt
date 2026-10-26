@@ -47,6 +47,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
 import android.widget.Toast
@@ -159,7 +160,8 @@ fun SendScreen(
     viewModel: SendViewModel = viewModel(),
     onNavigateToHistory: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
-    onOpenScanner: () -> Unit = {}
+    onOpenScanner: () -> Unit = {},
+    onNavigateToGuide: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -232,6 +234,9 @@ fun SendScreen(
                     )
                 },
                 actions = {
+                    IconButton(onClick = onNavigateToGuide) {
+                        Icon(Icons.Outlined.HelpOutline, contentDescription = stringResource(R.string.guide_title))
+                    }
                     IconButton(onClick = onNavigateToHistory) {
                         Icon(Icons.Outlined.History, contentDescription = stringResource(R.string.nav_history))
                     }
