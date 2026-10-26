@@ -52,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dking.crocapp.R
 import com.dking.crocapp.croc.CrocTransferState
 import com.dking.crocapp.ui.components.GlassCard
+import com.dking.crocapp.ui.components.ModeDot
 import com.dking.crocapp.ui.components.QrCodeImage
 import com.dking.crocapp.ui.components.TransferProgressCard
 import com.dking.crocapp.util.QrCodeParser
@@ -97,7 +98,12 @@ fun PanelReceiveScreen(
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.nav_receive), fontWeight = FontWeight.Bold) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.nav_receive), fontWeight = FontWeight.Bold)
+                        ModeDot(modifier = Modifier.padding(start = 4.dp))
+                    }
+                },
                 actions = {
                     IconButton(onClick = onNavigateToHistory) {
                         Icon(Icons.Outlined.History, contentDescription = stringResource(R.string.nav_history))
@@ -164,7 +170,9 @@ fun PanelReceiveScreen(
             val statusBlock: @Composable () -> Unit = {
                 Column(
                     modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    // Stacked under the QR on phones: centre it like the QR above.
+                    horizontalAlignment = if (wide) Alignment.Start else Alignment.CenterHorizontally
                 ) {
                     when (state) {
                         is CrocTransferState.Transferring -> {

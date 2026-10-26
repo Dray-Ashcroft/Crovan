@@ -537,8 +537,6 @@
     <string name="receive_input_code_save_default">Save as default code phrase</string>
 
     <!-- Panel mode (smart panels / tablets) -->
-    <string name="settings_panel_mode">Panel mode</string>
-    <string name="settings_panel_mode_desc">Open on Receive with a large QR code that refreshes itself. For smart panels and tablets.</string>
     <string name="panel_title">Scan to send</string>
     <string name="panel_subtitle">On your phone: Send → Scan QR → pick a file</string>
     <string name="panel_code_label">Code</string>
@@ -550,9 +548,10 @@
     <string name="panel_new_code_now">New code</string>
     <string name="panel_last_received">Last received</string>
     <string name="send_scan_qr">Scan QR</string>
-    <string name="settings_mode">Mode</string>
     <string name="mode_meko">Meko</string>
     <string name="mode_rimas">Rimas</string>
-    <string name="mode_meko_desc">Phone · Send and Receive</string>
-    <string name="mode_rimas_desc">Panel · waits in Receive with a QR code</string>
+    <string name="mode_dot_a11y">Mode: %1$s. Hold to switch.</string>
+    <string name="mode_summoned_meko">🐊 Meko is summoned</string>
+    <string name="mode_summoned_rimas">🐊 Rimas is summoned</string>
+    <string name="settings_header_mode">Krok : %1$s Mode</string>
 </resources>

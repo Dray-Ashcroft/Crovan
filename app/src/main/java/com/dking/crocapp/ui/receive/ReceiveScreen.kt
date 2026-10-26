@@ -179,10 +179,13 @@ fun ReceiveScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        stringResource(R.string.nav_receive),
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(R.string.nav_receive),
+                            fontWeight = FontWeight.Bold
+                        )
+                        com.dking.crocapp.ui.components.ModeDot(modifier = Modifier.padding(start = 4.dp))
+                    }
                 },
                 actions = {
                     IconButton(onClick = onNavigateToHistory) {

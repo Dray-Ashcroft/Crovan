@@ -45,6 +45,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
@@ -195,21 +196,17 @@ fun CrocApp(
     val setupState by binaryManager.setupState.collectAsStateWithLifecycle()
     val retryScope = rememberCoroutineScope()
 
-    val showBottomBar = currentRoute in CrocDestination.bottomNavItems.map { it.route }
+    val showBottomBar = currentRoute in CrocDestination.bottomNavItems.map { it.route } &&
+            !settingsViewModel.preferences.collectAsStateWithLifecycle().value.panelMode
 
     val sendViewModel: SendViewModel = viewModel()
     val receiveViewModel: ReceiveViewModel = viewModel()
 
-    // Panel mode: open straight on Receive (once per launch, and not when the
-    // app was opened by a share or deep link).
-    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
-    var panelStartChecked by rememberSaveable { mutableStateOf(false) }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        if (panelStartChecked) return@LaunchedEffect
-        panelStartChecked = true
-        val panelMode = com.dking.crocapp.data.preferences.UserPreferencesRepository(appContext)
-            .preferencesFlow.first().panelMode
-        if (panelMode && sharedContent is SharedContent.None) {
+    // Rimas (panel mode) is Receive-only: no bottom bar, and never on Send.
+    // This also opens a Rimas device straight on the QR screen at launch.
+    val appPrefs by settingsViewModel.preferences.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(appPrefs.panelMode, currentRoute) {
+        if (appPrefs.panelMode && currentRoute == CrocDestination.Send.route) {
             navController.navigate(CrocDestination.Receive.route) {
                 popUpTo(navController.graph.findStartDestination().id) {
                     saveState = true
@@ -367,6 +364,7 @@ fun CrocApp(
         // Smart panels / big tablets: much weaker GPU per pixel, so page
         // switches there use a plain slide (no card scale/clip, no alpha).
         val largeScreen = androidx.compose.ui.platform.LocalConfiguration.current.smallestScreenWidthDp >= 600
+        Box(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
             startDestination = CrocDestination.Send.route,
@@ -474,16 +472,6 @@ fun CrocApp(
                     viewModel = settingsViewModel,
                     onNavigateBack = {
                         navController.popBackStack()
-                    },
-                    onSwitchedToPanel = {
-                        // Rimas picked: jump straight to the panel's QR screen.
-                        navController.navigate(CrocDestination.Receive.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
                     }
                 )
             }
@@ -525,6 +513,14 @@ fun CrocApp(
                     }
                 )
             }
+        }
+        // "Meko / Rimas is summoned" pill, above every screen.
+        com.dking.crocapp.ui.components.ModeCalloutHost(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(paddingValues)
+                .padding(top = 72.dp)
+        )
         }
     }
 }
