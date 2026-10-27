@@ -44,9 +44,9 @@
 ## 📱 Screenshots
 
 <p align="center">
-  <img src="Screenshots/send.png" alt="Meet Kroc-Sauria" width="45%">
+  <img src="Screenshots/Send.png" alt="Meet Kroc-Sauria" width="45%">
   &nbsp;
-  <img src="Screenshots/receive" alt="Refreshing UI" width="45%">
+  <img src="Screenshots/Receive" alt="Refreshing UI" width="45%">
 </p>
 
 <p align="center">
