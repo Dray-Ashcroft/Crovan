@@ -1,0 +1,16 @@
+# Baseline profile for Crovan.
+#
+# Tells Android which code to compile ahead of time (instead of interpreting
+# it on first use), so app start and the first Send <-> Receive switches are
+# smoother — this matters most on slow smart panels.
+#
+# Jetpack Compose, Navigation, Material 3, etc. already ship their own
+# profiles inside their libraries; AGP merges them with this file.
+# These rules cover all of Crovan's own code (screens, view models, the
+# crocodile rig, croc process handling). "**" is a wildcard.
+
+# Pre-compile every method in the app's own code.
+HSPLcom/dking/crocapp/**->**(**)**
+
+# Load every app class up front at startup.
+Lcom/dking/crocapp/**;
