@@ -44,15 +44,15 @@
 ## 📱 Screenshots
 
 <p align="center">
-  <img src="Screenshots/01-meet-kroc-sauria.png" alt="Meet Kroc-Sauria" width="45%">
+  <img src="Screenshots/send.png" alt="Meet Kroc-Sauria" width="45%">
   &nbsp;
-  <img src="Screenshots/02-walks-like-a-croc.png" alt="Walks Like a Croc" width="45%">
+  <img src="Screenshots/receive" alt="Refreshing UI" width="45%">
 </p>
 
 <p align="center">
-  <img src="Screenshots/03-scan-and-send.png" alt="Scan &amp; Send" width="45%">
+  <img src="Screenshots/Meko.png" alt="Scan &amp; Send" width="45%">
   &nbsp;
-  <img src="Screenshots/04-after-dark.png" alt="After Dark" width="45%">
+  <img src="Screenshots/Rimas.png" alt="Panel Mode" width="45%">
 </p>
 
 ## ⚙️ Technology
