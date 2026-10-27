@@ -226,10 +226,6 @@ dependencies {
     // Splash Screen
     implementation("androidx.core:core-splashscreen:1.0.1")
 
-    // Installs the baseline profile (src/main/baseline-prof.txt) on devices
-    // that don't get it from the Play Store — e.g. sideloaded GitHub APKs.
-    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
-
     // Testing
     testImplementation("junit:junit:4.13.2")
 

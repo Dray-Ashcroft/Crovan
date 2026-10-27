@@ -68,13 +68,6 @@ jobs:
           sha256sum dist/Kroc-Sauria-release.apk | tee dist/SHA256.txt
           rm -f "$RUNNER_TEMP/release.jks"
 
-      - name: Check baseline profile is packaged
-        run: |
-          set -euo pipefail
-          APK=dist/Kroc-Sauria-release.apk
-          unzip -l "$APK" | grep -E "assets/dexopt/baseline\.prof(m)?$" \
-            || { echo "::error::Baseline profile missing from release APK"; exit 1; }
-
       - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
