@@ -46,7 +46,7 @@
 <p align="center">
   <img src="Screenshots/Send.png" alt="Meet Kroc-Sauria" width="45%">
   &nbsp;
-  <img src="Screenshots/Receive" alt="Refreshing UI" width="45%">
+  <img src="Screenshots/Receive.png" alt="Refreshing UI" width="45%">
 </p>
 
 <p align="center">
