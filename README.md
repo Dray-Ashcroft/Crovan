@@ -2,7 +2,7 @@
   <img src="assets/banner.png" alt="Kroc-Sauria — Minimalist File Sharing" width="100%">
 </p>
 
-<h1 align="center">Kroc-Sauria</h1>
+<h1 align="center">Crovan</h1>
 
 <p align="center">
   <strong>Minimalist file sharing across devices.</strong><br>
