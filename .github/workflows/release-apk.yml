@@ -6,6 +6,18 @@ name: Build signed release APK
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Publish a GitHub Release with this tag (e.g. Crovan.Mrk-IV). Leave empty to only build."
+        required: false
+        default: ""
+      release_title:
+        description: 'Release title (e.g. Crovan RC IV "Delta")'
+        required: false
+        default: ""
+
+permissions:
+  contents: write
 
 jobs:
   release:
@@ -62,14 +74,29 @@ jobs:
             --ks-key-alias "$KEY_ALIAS" \
             --ks-pass env:KEYSTORE_PASSWORD \
             --key-pass env:KEY_PASSWORD \
-            --out dist/Kroc-Sauria-release.apk \
+            --out dist/Crovan-release.apk \
             "$RUNNER_TEMP/aligned.apk"
-          "$BT/apksigner" verify --verbose --print-certs dist/Kroc-Sauria-release.apk
-          sha256sum dist/Kroc-Sauria-release.apk | tee dist/SHA256.txt
+          "$BT/apksigner" verify --verbose --print-certs dist/Crovan-release.apk
+          sha256sum dist/Crovan-release.apk | tee dist/SHA256.txt
           rm -f "$RUNNER_TEMP/release.jks"
 
       - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: kroc-sauria-release
+          name: crovan-release
           path: dist/*
+
+      - name: Publish GitHub Release
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.release_tag }}
+          TITLE: ${{ inputs.release_title }}
+        run: |
+          set -euo pipefail
+          NOTES=".github/release-notes/${TAG}.md"
+          [ -f "$NOTES" ] || { echo "::error::Release notes $NOTES not found"; exit 1; }
+          gh release create "$TAG" dist/* \
+            --title "${TITLE:-$TAG}" \
+            --notes-file "$NOTES" \
+            --target "$GITHUB_SHA"
