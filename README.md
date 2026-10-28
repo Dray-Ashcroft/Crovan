@@ -32,7 +32,7 @@
 - 🔗 Share sheet and `croc://` deep links
 - 🖥️ Panel mode (Rimas) — smart panels wait with a self-refreshing QR code
 
-## ✦ What's New — Mk IV "Delta"
+## ✦ What's New : RC - IV "Delta"
 
 - 🟣 Rimas panel mode — receive-only screen with a large, self-refreshing QR
 - 🟢 Mode dot — hold to switch Meko (phone) ⇄ Rimas (panel)
@@ -63,9 +63,9 @@
 
 ## ✦ Credits
 
-- **Croc engine** — [schollz](https://github.com/schollz/croc)
-- **Original Android client** — Dastageer Siddiqui ([Dking08](https://github.com/Dking08))
-- **Crovan design & animation** — this fork
+- **Croc engine** - [schollz](https://github.com/schollz/croc)
+- **Original Android client** - Dastageer Siddiqui ([Dking08](https://github.com/Dking08))
+- **Crovan design & animation** - this fork
 
 Licensed under [GPL v3](LICENSE).
 
