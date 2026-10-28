@@ -47,6 +47,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
 import android.widget.Toast
@@ -67,7 +68,9 @@ import androidx.compose.material.icons.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.QrCode2
+import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Save
@@ -157,13 +160,16 @@ private const val MAX_VISIBLE_FILES = 6
 fun SendScreen(
     viewModel: SendViewModel = viewModel(),
     onNavigateToHistory: () -> Unit = {},
-    onNavigateToSettings: () -> Unit = {}
+    onNavigateToSettings: () -> Unit = {},
+    onOpenScanner: () -> Unit = {},
+    onNavigateToGuide: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     var showQrCode by remember { mutableStateOf(false) }
-    var hideCodePhrase by remember { mutableStateOf(true) }
+    var hideCodePhrase by remember { mutableStateOf(false) }
+    var showCodeMenu by remember { mutableStateOf(false) }
     var showAllFiles by remember { mutableStateOf(false) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -224,12 +230,18 @@ fun SendScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        stringResource(R.string.nav_send),
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(R.string.nav_send),
+                            fontWeight = FontWeight.Bold
+                        )
+                        com.dking.crocapp.ui.components.ModeDot(modifier = Modifier.padding(start = 4.dp))
+                    }
                 },
                 actions = {
+                    IconButton(onClick = onNavigateToGuide) {
+                        Icon(Icons.Outlined.HelpOutline, contentDescription = stringResource(R.string.guide_title))
+                    }
                     IconButton(onClick = onNavigateToHistory) {
                         Icon(Icons.Outlined.History, contentDescription = stringResource(R.string.nav_history))
                     }
@@ -243,9 +255,19 @@ fun SendScreen(
                 )
             )
         },
-        floatingActionButton = {
+        bottomBar = {
+            // ③ Full-width main action. It sits below the content (never
+            // covers it) and is dimmed until there is something to send.
             if (!isTransferActive) {
-                ExtendedFloatingActionButton(
+                com.dking.crocapp.ui.components.PrimaryActionBar(
+                    text = fabLabel,
+                    icon = when {
+                        isLegacyFallback -> Icons.Rounded.History
+                        isStoreCompleted -> Icons.AutoMirrored.Rounded.Send
+                        uiState.isStoreMode -> Icons.Rounded.CloudUpload
+                        else -> Icons.AutoMirrored.Rounded.Send
+                    },
+                    enabled = canSend || isLegacyFallback || isStoreCompleted,
                     onClick = {
                         if (isLegacyFallback) {
                             viewModel.retryWithLegacy()
@@ -258,25 +280,7 @@ fun SendScreen(
                             }
                             viewModel.startSend()
                         }
-                    },
-                    icon = {
-                        Icon(
-                            when {
-                                isLegacyFallback -> Icons.Rounded.History
-                                isStoreCompleted -> Icons.AutoMirrored.Rounded.Send
-                                uiState.isStoreMode -> Icons.Rounded.CloudUpload
-                                else -> Icons.AutoMirrored.Rounded.Send
-                            },
-                            contentDescription = null
-                        )
-                    },
-                    text = { Text(fabLabel, fontWeight = FontWeight.SemiBold) },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    elevation = FloatingActionButtonDefaults.elevation(
-                        defaultElevation = 3.dp
-                    ),
-                    expanded = canSend || isLegacyFallback || isStoreCompleted
+                    }
                 )
             }
         }
@@ -396,26 +400,29 @@ fun SendScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = stringResource(R.string.send_files_title),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            if (uiState.selectedFiles.isNotEmpty()) {
-                                Text(
-                                    text = "${uiState.selectedFiles.size} • ${formatBytes(uiState.selectedBytes)}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
+                        com.dking.crocapp.ui.components.StepTitle(
+                            number = 1,
+                            title = stringResource(R.string.send_files_title),
+                            trailing = if (uiState.selectedFiles.isNotEmpty()) {
+                                {
+                                    Text(
+                                        text = "${uiState.selectedFiles.size} • ${formatBytes(uiState.selectedBytes)}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            } else null
+                        )
 
-                        Row(
+                        if (uiState.selectedFiles.isEmpty()) {
+                            com.dking.crocapp.ui.components.PickTarget(
+                                icon = Icons.Rounded.AttachFile,
+                                label = stringResource(R.string.send_tap_to_pick_files),
+                                hint = stringResource(R.string.send_pick_hint),
+                                enabled = !isTransferActive,
+                                onClick = { filePickerLauncher.launch(arrayOf("*/*")) }
+                            )
+                        } else Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
@@ -471,13 +478,6 @@ fun SendScreen(
                                     }
                                 )
                             }
-                        } else {
-                            Text(
-                                text = stringResource(R.string.send_no_files),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
                         }
                     }
                 }
@@ -506,26 +506,28 @@ fun SendScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Folder",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            if (uiState.selectedFolderName != null) {
-                                Text(
-                                    text = "${uiState.selectedFolderFileCount} files • ${formatBytes(uiState.selectedFolderSize)}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
+                        com.dking.crocapp.ui.components.StepTitle(
+                            number = 1,
+                            title = stringResource(R.string.send_mode_folder),
+                            trailing = if (uiState.selectedFolderName != null) {
+                                {
+                                    Text(
+                                        text = "${uiState.selectedFolderFileCount} files • ${formatBytes(uiState.selectedFolderSize)}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            } else null
+                        )
 
-                        Row(
+                        if (uiState.selectedFolderName == null) {
+                            com.dking.crocapp.ui.components.PickTarget(
+                                icon = Icons.Rounded.FolderOpen,
+                                label = stringResource(R.string.send_tap_to_pick_folder),
+                                enabled = !isTransferActive,
+                                onClick = { folderPickerLauncher.launch(null) }
+                            )
+                        } else Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
@@ -592,13 +594,6 @@ fun SendScreen(
                                     )
                                 }
                             }
-                        } else {
-                            Text(
-                                text = stringResource(R.string.send_no_folder),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
                         }
                     }
                 }
@@ -617,10 +612,9 @@ fun SendScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text(
-                            text = stringResource(R.string.send_quick_text),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
+                        com.dking.crocapp.ui.components.StepTitle(
+                            number = 1,
+                            title = stringResource(R.string.send_quick_text)
                         )
                         OutlinedTextField(
                             value = uiState.textToSend,
@@ -638,40 +632,6 @@ fun SendScreen(
 
             } // when
             } // AnimatedContent
-
-            // ──── Transfer Progress / Result ────
-            AnimatedVisibility(
-                visible = showTransferSection,
-                enter = fadeIn() + slideInVertically { it / 2 },
-                exit = fadeOut() + slideOutVertically { it / 2 }
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (isStoreCompleted) {
-                        StoreCompletedCard(
-                            state = uiState.transferState as CrocTransferState.StoreCompleted,
-                            onDismiss = { viewModel.dismissTransferResult() },
-                            onRevoke = { id -> viewModel.revokeCurrentStore(id) }
-                        )
-                    } else {
-                        TransferProgressCard(
-                            state = uiState.transferState,
-                            isSending = true,
-                            onCancel = { viewModel.cancelTransfer() },
-                            onRetryLegacy = { viewModel.retryWithLegacy() },
-                            activeEngine = uiState.activeEngine
-                        )
-                        if (isTransferFinished) {
-                            OutlinedButton(
-                                onClick = { viewModel.dismissTransferResult() },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = MaterialTheme.shapes.large
-                            ) {
-                                Text(stringResource(R.string.action_dismiss))
-                            }
-                        }
-                    }
-                }
-            }
 
             // ──── Delivery Options: Store Config OR Direct Code Phrase ────
             if (uiState.isStoreMode) {
@@ -694,27 +654,16 @@ fun SendScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        com.dking.crocapp.ui.components.StepTitle(
+                            number = 2,
+                            title = stringResource(R.string.send_secret_code)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
+                            if (uiState.defaultCodePhrase.isNotBlank() && uiState.defaultCodePhrase == uiState.codePhrase) {
                                 Text(
-                                    text = stringResource(R.string.send_secret_code),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold
+                                    text = stringResource(R.string.label_default),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
                                 )
-                                if (uiState.defaultCodePhrase.isNotBlank() && uiState.defaultCodePhrase == uiState.codePhrase) {
-                                    Text(
-                                        text = stringResource(R.string.label_default),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
                             }
                             EngineBadge(
                                 engine = uiState.activeEngine,
@@ -730,77 +679,98 @@ fun SendScreen(
                         singleLine = true,
                         placeholder = { Text(stringResource(R.string.send_code_placeholder)) },
                         shape = MaterialTheme.shapes.large,
+                        // Shown large and readable by default: the sender usually
+                        // reads it out or shows it to the receiver.
+                        textStyle = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontWeight = FontWeight.SemiBold
+                        ),
                         visualTransformation = if (hideCodePhrase) PasswordVisualTransformation() else VisualTransformation.None,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
                         trailingIcon = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = { hideCodePhrase = !hideCodePhrase }) {
-                                    Icon(
-                                        imageVector = if (hideCodePhrase) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
-                                        contentDescription = if (hideCodePhrase) stringResource(R.string.send_show_code) else stringResource(R.string.send_hide_code)
-                                    )
-                                }
                                 IconButton(onClick = {
                                     clipboardManager.setText(AnnotatedString(uiState.codePhrase))
                                 }) {
                                     Icon(Icons.Rounded.ContentCopy, contentDescription = stringResource(R.string.send_copy_code))
                                 }
+                                IconButton(
+                                    onClick = { viewModel.regenerateCode() },
+                                    enabled = !isTransferActive
+                                ) {
+                                    Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.send_regenerate))
+                                }
                             }
                         }
                     )
 
-                    // Action chips
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    // Main extra action + everything else tucked into ⋮
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        AssistChip(
-                            onClick = { viewModel.regenerateCode() },
+                        // Scan a smart panel's QR to send straight to it.
+                        FilledTonalButton(
+                            onClick = onOpenScanner,
                             enabled = !isTransferActive,
-                            label = { Text(stringResource(R.string.send_regenerate)) },
-                            leadingIcon = {
-                                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                            }
-                        )
-                        AssistChip(
-                            onClick = { viewModel.saveCurrentCode() },
-                            enabled = !isTransferActive && uiState.codePhrase.isNotBlank(),
-                            label = { Text(stringResource(R.string.action_save)) },
-                            leadingIcon = {
-                                Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                            }
-                        )
-                        if (uiState.defaultCodePhrase.isNotBlank() && uiState.defaultCodePhrase != uiState.codePhrase) {
-                            AssistChip(
-                                onClick = { viewModel.useCodePhrase(uiState.defaultCodePhrase) },
-                                enabled = !isTransferActive,
-                                label = { Text(stringResource(R.string.action_reset)) },
-                                leadingIcon = {
-                                    Icon(Icons.Rounded.Home, contentDescription = stringResource(R.string.send_use_default_code), modifier = Modifier.size(18.dp))
-                                }
-                            )
+                            modifier = Modifier.weight(1f),
+                            shape = MaterialTheme.shapes.large
+                        ) {
+                            Icon(Icons.Rounded.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.send_scan_panel_qr))
                         }
-                        AssistChip(
-                            onClick = { showQrCode = !showQrCode },
-                            enabled = uiState.codePhrase.isNotBlank(),
-                            label = { Text(if (showQrCode) stringResource(R.string.send_hide_qr) else stringResource(R.string.send_qr_code)) },
-                            leadingIcon = {
-                                Icon(Icons.Rounded.QrCode2, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Box {
+                            IconButton(onClick = { showCodeMenu = true }) {
+                                Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.action_more_options))
                             }
-                        )
-                        AssistChip(
-                            onClick = {
-                                shareQrCode(
-                                    context = context,
-                                    codePhrase = uiState.codePhrase
+                            androidx.compose.material3.DropdownMenu(
+                                expanded = showCodeMenu,
+                                onDismissRequest = { showCodeMenu = false }
+                            ) {
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.action_save)) },
+                                    enabled = !isTransferActive && uiState.codePhrase.isNotBlank(),
+                                    onClick = { showCodeMenu = false; viewModel.saveCurrentCode() },
+                                    leadingIcon = { Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(18.dp)) }
                                 )
-                            },
-                            enabled = uiState.codePhrase.isNotBlank(),
-                            label = { Text(stringResource(R.string.send_share_qr)) },
-                            leadingIcon = {
-                                Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                                if (uiState.defaultCodePhrase.isNotBlank() && uiState.defaultCodePhrase != uiState.codePhrase) {
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.send_use_default_code)) },
+                                        enabled = !isTransferActive,
+                                        onClick = { showCodeMenu = false; viewModel.useCodePhrase(uiState.defaultCodePhrase) },
+                                        leadingIcon = { Icon(Icons.Rounded.Home, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                    )
+                                }
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(if (showQrCode) stringResource(R.string.send_hide_qr) else stringResource(R.string.send_qr_code)) },
+                                    enabled = uiState.codePhrase.isNotBlank(),
+                                    onClick = { showCodeMenu = false; showQrCode = !showQrCode },
+                                    leadingIcon = { Icon(Icons.Rounded.QrCode2, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                )
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.send_share_qr)) },
+                                    enabled = uiState.codePhrase.isNotBlank(),
+                                    onClick = {
+                                        showCodeMenu = false
+                                        shareQrCode(context = context, codePhrase = uiState.codePhrase)
+                                    },
+                                    leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                )
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(if (hideCodePhrase) stringResource(R.string.send_show_code) else stringResource(R.string.send_hide_code)) },
+                                    onClick = { showCodeMenu = false; hideCodePhrase = !hideCodePhrase },
+                                    leadingIcon = {
+                                        Icon(
+                                            if (hideCodePhrase) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                )
                             }
-                        )
+                        }
                     }
 
                     // Saved codes — scrollable 2-row horizontal grid
@@ -859,127 +829,76 @@ fun SendScreen(
             }
         }
 
-        // ──── Mode Switch Banners at the Bottom ────
-        if (!isTransferActive && !isStoreCompleted) {
-                if (!uiState.isStoreMode) {
-                    // Switch to Store Mode Card
-                    Surface(
-                        onClick = { viewModel.setDeliveryMode(DeliveryMode.STORE) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.extraLarge,
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            // ──── Transfer Progress / Result ────
+            AnimatedVisibility(
+                visible = showTransferSection,
+                enter = fadeIn() + slideInVertically { it / 2 },
+                exit = fadeOut() + slideOutVertically { it / 2 }
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (isStoreCompleted) {
+                        StoreCompletedCard(
+                            state = uiState.transferState as CrocTransferState.StoreCompleted,
+                            onDismiss = { viewModel.dismissTransferResult() },
+                            onRevoke = { id -> viewModel.revokeCurrentStore(id) }
+                        )
+                    } else {
+                        TransferProgressCard(
+                            state = uiState.transferState,
+                            isSending = true,
+                            onCancel = { viewModel.cancelTransfer() },
+                            onRetryLegacy = { viewModel.retryWithLegacy() },
+                            activeEngine = uiState.activeEngine
+                        )
+                        if (isTransferFinished) {
+                            OutlinedButton(
+                                onClick = { viewModel.dismissTransferResult() },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.large
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primaryContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.CloudUpload,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text(
-                                        text = stringResource(R.string.mode_switch_store_title),
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.mode_switch_store_desc),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                                Text(stringResource(R.string.action_dismiss))
                             }
-                            Icon(
-                                Icons.AutoMirrored.Rounded.ArrowForward,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                } else {
-                    // Switch to Normal Direct Mode Card
-                    Surface(
-                        onClick = { viewModel.setDeliveryMode(DeliveryMode.DIRECT) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.extraLarge,
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.AutoMirrored.Rounded.Send,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text(
-                                        text = stringResource(R.string.mode_switch_normal_title),
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.mode_switch_normal_desc),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            Icon(
-                                Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
                         }
                     }
                 }
             }
 
-            // Bottom padding for FAB clearance
-            Spacer(modifier = Modifier.height(80.dp))
+            // Delivery: Direct (live, peer-to-peer) or Store (upload for later pickup)
+            if (!isTransferActive && !isStoreCompleted) {
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                        onClick = { viewModel.setDeliveryMode(DeliveryMode.DIRECT) },
+                        selected = !uiState.isStoreMode,
+                        icon = {
+                            Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+                    ) {
+                        Text(stringResource(R.string.send_delivery_direct))
+                    }
+                    SegmentedButton(
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                        onClick = { viewModel.setDeliveryMode(DeliveryMode.STORE) },
+                        selected = uiState.isStoreMode,
+                        icon = {
+                            Icon(Icons.Rounded.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+                    ) {
+                        Text(stringResource(R.string.send_delivery_store))
+                    }
+                }
+                Text(
+                    text = stringResource(
+                        if (uiState.isStoreMode) R.string.mode_switch_store_desc else R.string.mode_switch_normal_desc
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }

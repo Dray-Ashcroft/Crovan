@@ -9,6 +9,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -60,6 +63,8 @@ import com.google.zxing.MultiFormatReader
 import com.google.zxing.NotFoundException
 import com.google.zxing.PlanarYUVLuminanceSource
 import com.google.zxing.Result
+import com.google.zxing.ReaderException
+import com.google.zxing.common.GlobalHistogramBinarizer
 import com.google.zxing.common.HybridBinarizer
 import java.util.EnumMap
 import java.util.concurrent.Executors
@@ -197,8 +202,22 @@ private fun CameraPreview(
                     it.surfaceProvider = previewView.surfaceProvider
                 }
 
+                // Full-HD frames, requested the portrait-safe way (ResolutionSelector
+                // sizes are given in the sensor's landscape orientation). The old
+                // setTargetResolution(1280x720) was landscape-in-portrait, so many
+                // phones fell back to small frames.
                 val imageAnalysis = ImageAnalysis.Builder()
-                    .setTargetResolution(Size(1280, 720))
+                    .setResolutionSelector(
+                        ResolutionSelector.Builder()
+                            .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
+                            .setResolutionStrategy(
+                                ResolutionStrategy(
+                                    Size(1920, 1080),
+                                    ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
+                                )
+                            )
+                            .build()
+                    )
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
 
@@ -251,61 +270,54 @@ private fun ImageProxy.decodeQrCode(reader: MultiFormatReader): Result? {
         return null
     }
 
-    return try {
-        val source = toQrLuminanceSource() ?: return null
-        reader.decodeWithState(BinaryBitmap(HybridBinarizer(source)))
-    } catch (_: NotFoundException) {
+    // QR detection doesn't care about orientation, so the frame is scanned as
+    // it comes from the camera (no per-frame rotation = more frames per second).
+    val luminance = extractLuminanceBytes() ?: return null
+    val full = PlanarYUVLuminanceSource(luminance, width, height, 0, 0, width, height, false)
+
+    // A screen filmed up close shows moiré stripes and flicker bands that can
+    // break a single decoding pass. Try a few cheap variants, stop at the first hit:
+    //  1. full frame, local (hybrid) thresholding — the original method
+    //  2. full frame, global thresholding — copes better with banding
+    //  3. half-size frame — averaging 2x2 pixels smooths out the screen pattern
+    tryDecode(reader, BinaryBitmap(HybridBinarizer(full)))?.let { return it }
+    tryDecode(reader, BinaryBitmap(GlobalHistogramBinarizer(full)))?.let { return it }
+    val halfW = width / 2
+    val halfH = height / 2
+    if (halfW >= 160 && halfH >= 160) {
+        val half = downsample2x(luminance, width, height)
+        val halfSource = PlanarYUVLuminanceSource(half, halfW, halfH, 0, 0, halfW, halfH, false)
+        tryDecode(reader, BinaryBitmap(HybridBinarizer(halfSource)))?.let { return it }
+    }
+    return null
+}
+
+private fun tryDecode(reader: MultiFormatReader, bitmap: BinaryBitmap): Result? =
+    try {
+        reader.decodeWithState(bitmap)
+    } catch (_: ReaderException) {
         null
     } finally {
         reader.reset()
     }
-}
 
-private fun ImageProxy.toQrLuminanceSource(): PlanarYUVLuminanceSource? {
-    val luminance = extractLuminanceBytes() ?: return null
-
-    return when (imageInfo.rotationDegrees) {
-        90 -> PlanarYUVLuminanceSource(
-            rotate90(luminance, width, height),
-            height,
-            width,
-            0,
-            0,
-            height,
-            width,
-            false
-        )
-        180 -> PlanarYUVLuminanceSource(
-            rotate180(luminance),
-            width,
-            height,
-            0,
-            0,
-            width,
-            height,
-            false
-        )
-        270 -> PlanarYUVLuminanceSource(
-            rotate270(luminance, width, height),
-            height,
-            width,
-            0,
-            0,
-            height,
-            width,
-            false
-        )
-        else -> PlanarYUVLuminanceSource(
-            luminance,
-            width,
-            height,
-            0,
-            0,
-            width,
-            height,
-            false
-        )
+/** Average each 2x2 block into one pixel (box filter) — removes fine screen moiré. */
+private fun downsample2x(data: ByteArray, width: Int, height: Int): ByteArray {
+    val w = width / 2
+    val h = height / 2
+    val out = ByteArray(w * h)
+    var o = 0
+    for (y in 0 until h) {
+        val r0 = (2 * y) * width
+        val r1 = r0 + width
+        for (x in 0 until w) {
+            val c = 2 * x
+            val sum = (data[r0 + c].toInt() and 0xFF) + (data[r0 + c + 1].toInt() and 0xFF) +
+                (data[r1 + c].toInt() and 0xFF) + (data[r1 + c + 1].toInt() and 0xFF)
+            out[o++] = (sum shr 2).toByte()
+        }
     }
+    return out
 }
 
 private fun ImageProxy.extractLuminanceBytes(): ByteArray? {
@@ -338,34 +350,4 @@ private fun ImageProxy.extractLuminanceBytes(): ByteArray? {
     }
 
     return data
-}
-
-private fun rotate90(data: ByteArray, width: Int, height: Int): ByteArray {
-    val rotated = ByteArray(data.size)
-    var index = 0
-    for (x in 0 until width) {
-        for (y in height - 1 downTo 0) {
-            rotated[index++] = data[y * width + x]
-        }
-    }
-    return rotated
-}
-
-private fun rotate180(data: ByteArray): ByteArray {
-    val rotated = ByteArray(data.size)
-    for (index in data.indices) {
-        rotated[index] = data[data.lastIndex - index]
-    }
-    return rotated
-}
-
-private fun rotate270(data: ByteArray, width: Int, height: Int): ByteArray {
-    val rotated = ByteArray(data.size)
-    var index = 0
-    for (x in width - 1 downTo 0) {
-        for (y in 0 until height) {
-            rotated[index++] = data[y * width + x]
-        }
-    }
-    return rotated
 }

@@ -106,7 +106,10 @@ fun QrCodeImage(
             Image(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = stringResource(R.string.qr_code_tap_to_expand),
-                modifier = Modifier.size(size)
+                modifier = Modifier.size(size),
+                // Hard square edges when the QR is drawn large (e.g. on a panel):
+                // smooth scaling blurs module edges and makes scanning harder.
+                filterQuality = androidx.compose.ui.graphics.FilterQuality.None
             )
 
             if (isClickable && showExpandHint && size >= 70.dp) {

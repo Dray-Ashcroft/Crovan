@@ -25,6 +25,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun updateRelayAddress(value: String) = viewModelScope.launch { prefsRepo.updateRelayAddress(value) }
     fun updateRelayPassword(value: String) = viewModelScope.launch { prefsRepo.updateRelayPassword(value) }
     fun updatePakeCurve(value: String) = viewModelScope.launch { prefsRepo.updatePakeCurve(value) }
+    fun updatePanelMode(value: Boolean) = viewModelScope.launch { prefsRepo.updatePanelMode(value) }
     fun updateForceLocal(value: Boolean) = viewModelScope.launch { prefsRepo.updateForceLocal(value) }
     fun updateDisableCompression(value: Boolean) = viewModelScope.launch { prefsRepo.updateDisableCompression(value) }
     fun updateUploadThrottle(value: String) = viewModelScope.launch { prefsRepo.updateUploadThrottle(value) }
@@ -35,8 +36,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun updateDefaultCodePhrase(value: String) = viewModelScope.launch { prefsRepo.updateDefaultCodePhrase(value) }
     fun saveCodePhrase(value: String) = viewModelScope.launch { prefsRepo.saveCodePhrase(value) }
     fun deleteCodePhrase(value: String) = viewModelScope.launch { prefsRepo.deleteCodePhrase(value) }
-    fun updateQuickSendCode(value: String) = viewModelScope.launch { prefsRepo.updateQuickSendCode(value) }
-    fun updateQuickReceiveCode(value: String) = viewModelScope.launch { prefsRepo.updateQuickReceiveCode(value) }
     fun updateReceiveLocation(uri: String) = viewModelScope.launch { prefsRepo.updateReceiveLocationUri(uri) }
     fun clearReceiveLocation() = viewModelScope.launch { prefsRepo.clearReceiveLocationUri() }
     fun updateTryLegacyFirst(value: Boolean) = viewModelScope.launch { prefsRepo.updateTryLegacyFirst(value) }

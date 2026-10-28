@@ -6,6 +6,7 @@ import android.os.Environment
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.dking.crocapp.CrocApp
+import com.dking.crocapp.croc.CodePhraseGenerator
 import com.dking.crocapp.croc.CrocBinaryManager
 import com.dking.crocapp.croc.CrocEngine
 import com.dking.crocapp.croc.CrocProcess
@@ -15,6 +16,9 @@ import com.dking.crocapp.data.db.TransferStatus
 import com.dking.crocapp.data.db.TransferType
 import com.dking.crocapp.data.preferences.UserPreferencesRepository
 import com.dking.crocapp.util.QrCodeParser
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,8 +42,15 @@ data class ReceiveUiState(
     val savedCodePhrases: List<String> = emptyList(),
     val receivedFiles: List<ReceivedFile> = emptyList(),
     val sessionOverrideUri: Uri? = null,
-    val receiveLocationLabel: String = "Downloads/croc-received"
+    val receiveLocationLabel: String = "Downloads/croc-received",
+    // ── Panel mode ──
+    val panelMode: Boolean = false,
+    /** When the current panel code was issued (ms), for the "new code in N min" hint. */
+    val panelCodeIssuedAt: Long = 0L
 )
+
+/** How often a waiting panel swaps to a fresh code (and QR). */
+const val PANEL_CODE_LIFETIME_MS = 10 * 60 * 1000L
 
 class ReceiveViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -49,12 +60,26 @@ class ReceiveViewModel(application: Application) : AndroidViewModel(application)
     private val crocProcess = CrocProcess(application, binaryManager, prefsRepo)
     private var currentOutputDir: File? = null
 
+    // The coroutine running the current croc receive, so it can be stopped
+    // cleanly before a new one starts (panel code refresh).
+    private var receiveJob: Job? = null
+
+    // Panel-mode session state
+    private var panelActive = false
+    private var panelWatcher: Job? = null
+    private var stateSince = System.currentTimeMillis()
+    private var panelFailures = 0
+    private var panelTriedLegacy = false
+
     private val _uiState = MutableStateFlow(ReceiveUiState())
     val uiState: StateFlow<ReceiveUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
             crocProcess.state.collect { state ->
+                if (state::class != _uiState.value.transferState::class) {
+                    stateSince = System.currentTimeMillis()
+                }
                 _uiState.update { it.copy(transferState = state) }
                 if (state is CrocTransferState.Completed) {
                     val prefs = prefsRepo.preferencesFlow.first()
@@ -89,7 +114,8 @@ class ReceiveViewModel(application: Application) : AndroidViewModel(application)
                         codePhrase = if (state.codePhrase.isBlank()) prefs.defaultCodePhrase else state.codePhrase,
                         defaultCodePhrase = prefs.defaultCodePhrase,
                         savedCodePhrases = prefs.savedCodePhrases,
-                        receiveLocationLabel = label
+                        receiveLocationLabel = label,
+                        panelMode = prefs.panelMode
                     )
                 }
             }
@@ -158,7 +184,14 @@ class ReceiveViewModel(application: Application) : AndroidViewModel(application)
         val code = _uiState.value.codePhrase.trim()
         if (code.isBlank()) return
 
-        viewModelScope.launch {
+        val previousJob = receiveJob
+        receiveJob = viewModelScope.launch {
+            // Make sure an older receive has fully stopped before starting
+            // a new one, so it can't overwrite the new transfer's state.
+            if (previousJob?.isActive == true) {
+                crocProcess.cancel()
+                previousJob.cancelAndJoin()
+            }
             val targetEngine = engine ?: _uiState.value.activeEngine.takeIf { it == CrocEngine.LEGACY }
                 ?: if (prefsRepo.preferencesFlow.first().tryLegacyFirst) {
                     CrocEngine.LEGACY
@@ -180,9 +213,123 @@ class ReceiveViewModel(application: Application) : AndroidViewModel(application)
             ).apply { mkdirs() }
             currentOutputDir = outputDir
 
-            _uiState.update { it.copy(receivedFiles = emptyList()) }
+            // On a panel, keep showing what arrived last until something new does.
+            if (!panelActive) {
+                _uiState.update { it.copy(receivedFiles = emptyList()) }
+            }
             crocProcess.receive(code, outputDir, engine = targetEngine)
         }
+    }
+
+    // ───────────────────────── Panel mode ─────────────────────────
+    //
+    // The panel waits as the RECEIVER with a code it generated itself, shown
+    // as a QR. A phone scans it and sends. The code is swapped for a fresh
+    // one every 10 minutes, after every transfer, and whenever the
+    // connection drops, so the QR on screen always works and an old photo
+    // of it soon stops working.
+
+    fun startPanelSession() {
+        if (panelActive) return
+        panelActive = true
+        panelFailures = 0
+        issueNewPanelCode()
+        panelWatcher?.cancel()
+        panelWatcher = viewModelScope.launch {
+            while (true) {
+                delay(1_000)
+                panelTick()
+            }
+        }
+    }
+
+    fun stopPanelSession() {
+        if (!panelActive) return
+        panelActive = false
+        panelWatcher?.cancel()
+        panelWatcher = null
+        receiveJob?.cancel()
+        crocProcess.reset()
+        currentOutputDir?.deleteRecursively()
+        currentOutputDir = null
+        // Don't leave the panel's throwaway code in the normal Receive form
+        // (e.g. after switching back to Meko).
+        _uiState.update {
+            it.copy(codePhrase = it.defaultCodePhrase, activeEngine = CrocEngine.CURRENT)
+        }
+    }
+
+    /** Manual "New code" button on the panel. */
+    fun refreshPanelCode() {
+        if (panelActive) issueNewPanelCode()
+    }
+
+    private fun issueNewPanelCode() {
+        // A refresh never resumes a half-finished download from an old code.
+        if (crocProcess.state.value !is CrocTransferState.Transferring) {
+            currentOutputDir?.deleteRecursively()
+            currentOutputDir = null
+        }
+        panelTriedLegacy = false
+        val code = CodePhraseGenerator.generate()
+        _uiState.update {
+            it.copy(
+                codePhrase = code,
+                activeEngine = CrocEngine.CURRENT,
+                panelCodeIssuedAt = System.currentTimeMillis()
+            )
+        }
+        startReceive(CrocEngine.CURRENT)
+    }
+
+    private fun panelTick() {
+        if (!panelActive) return
+        val now = System.currentTimeMillis()
+        val inState = now - stateSince
+        val codeAge = now - _uiState.value.panelCodeIssuedAt
+        when (crocProcess.state.value) {
+            is CrocTransferState.Preparing,
+            is CrocTransferState.WaitingForPeer -> {
+                // Waiting steadily means the relay is reachable again.
+                if (inState >= 30_000) panelFailures = 0
+                if (codeAge >= PANEL_CODE_LIFETIME_MS) issueNewPanelCode()
+            }
+            is CrocTransferState.Transferring -> Unit // never interrupt a transfer
+            is CrocTransferState.Completed -> {
+                panelFailures = 0
+                // Leave "Received!" on screen briefly, then wait for the next sender.
+                if (inState >= 6_000) issueNewPanelCode()
+            }
+            is CrocTransferState.LegacyFallbackAvailable -> {
+                // The phone is on an older croc: retry the same code with the
+                // legacy engine once, otherwise move on to a fresh code.
+                if (!panelTriedLegacy) {
+                    panelTriedLegacy = true
+                    _uiState.update { it.copy(activeEngine = CrocEngine.LEGACY) }
+                    startReceive(engine = CrocEngine.LEGACY)
+                } else if (inState >= 3_000) {
+                    issueNewPanelCode()
+                }
+            }
+            is CrocTransferState.Error,
+            is CrocTransferState.Cancelled,
+            is CrocTransferState.Idle,
+            is CrocTransferState.StoreCompleted -> {
+                // Connection dropped / no internet: back off 3s, 6s, 12s… up to 60s
+                // so an offline panel doesn't hammer the relay.
+                val backoff = (3_000L shl panelFailures.coerceAtMost(5)).coerceAtMost(60_000L)
+                if (inState >= backoff) {
+                    panelFailures++
+                    issueNewPanelCode()
+                }
+            }
+        }
+    }
+
+    override fun onCleared() {
+        panelActive = false
+        crocProcess.cancel()
+        super.onCleared()
     }
 
     fun retryWithLegacy() {

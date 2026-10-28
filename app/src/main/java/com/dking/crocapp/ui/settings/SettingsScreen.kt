@@ -7,6 +7,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -173,7 +175,10 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Text(
-                            text = stringResource(R.string.app_name),
+                            text = stringResource(
+                                R.string.settings_header_mode,
+                                stringResource(if (prefs.panelMode) R.string.mode_rimas else R.string.mode_meko)
+                            ),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -350,36 +355,6 @@ fun SettingsScreen(
                         }
                     }
                 }
-            }
-
-            // Quick Transfer
-            SettingsSection(icon = Icons.Rounded.Speed, title = stringResource(R.string.settings_quick_transfer)) {
-                TextFieldSetting(
-                    label = stringResource(R.string.settings_quick_send_code_label),
-                    value = prefs.quickSendCode,
-                    onValueChange = { viewModel.updateQuickSendCode(it) },
-                    placeholder = if (prefs.defaultCodePhrase.isNotBlank())
-                        stringResource(R.string.settings_quick_using_default, prefs.defaultCodePhrase)
-                    else stringResource(R.string.settings_quick_leave_blank)
-                )
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 4.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                )
-                TextFieldSetting(
-                    label = stringResource(R.string.settings_quick_receive_code_label),
-                    value = prefs.quickReceiveCode,
-                    onValueChange = { viewModel.updateQuickReceiveCode(it) },
-                    placeholder = if (prefs.defaultCodePhrase.isNotBlank())
-                        stringResource(R.string.settings_quick_using_default, prefs.defaultCodePhrase)
-                    else stringResource(R.string.settings_quick_leave_blank)
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = stringResource(R.string.settings_quick_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
 
             // Storage / Receive Location

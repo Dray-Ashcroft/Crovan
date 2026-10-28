@@ -26,6 +26,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -41,10 +43,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
@@ -73,8 +77,6 @@ import com.dking.crocapp.ui.components.liquidGlass
 import com.dking.crocapp.ui.guide.GuideScreen
 import com.dking.crocapp.ui.history.HistoryScreen
 import com.dking.crocapp.ui.navigation.CrocDestination
-import com.dking.crocapp.ui.quick.QuickScreen
-import com.dking.crocapp.ui.quick.QuickViewModel
 import com.dking.crocapp.ui.receive.ReceiveScreen
 import com.dking.crocapp.ui.receive.ReceiveViewModel
 import com.dking.crocapp.ui.scanner.QrScannerScreen
@@ -86,6 +88,7 @@ import com.dking.crocapp.ui.settings.SettingsViewModel
 import com.dking.crocapp.ui.theme.CrocTheme
 import com.dking.crocapp.util.QrCodeParser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -164,7 +167,12 @@ class MainActivity : AppCompatActivity() {
             Intent.ACTION_VIEW -> {
                 val rawData = intent.data?.toString().orEmpty()
                 val code = QrCodeParser.parseCode(rawData)
-                if (code.isNotEmpty()) SharedContent.ReceiveCode(code) else SharedContent.None
+                when {
+                    code.isEmpty() -> SharedContent.None
+                    // A panel's QR: the panel receives, so this phone sends.
+                    QrCodeParser.isSendDeepLink(rawData) -> SharedContent.SendCode(code)
+                    else -> SharedContent.ReceiveCode(code)
+                }
             }
             else -> SharedContent.None
         }
@@ -176,6 +184,7 @@ sealed class SharedContent {
     data class Files(val uris: List<Uri>) : SharedContent()
     data class Text(val text: String) : SharedContent()
     data class ReceiveCode(val code: String) : SharedContent()
+    data class SendCode(val code: String) : SharedContent()
 }
 
 @Composable
@@ -190,11 +199,30 @@ fun CrocApp(
     val setupState by binaryManager.setupState.collectAsStateWithLifecycle()
     val retryScope = rememberCoroutineScope()
 
-    val showBottomBar = currentRoute in CrocDestination.bottomNavItems.map { it.route }
-
     val sendViewModel: SendViewModel = viewModel()
     val receiveViewModel: ReceiveViewModel = viewModel()
-    val quickViewModel: QuickViewModel = viewModel()
+
+    // Send and Receive live side by side in one pager on the "home" route.
+    // Both screens are built once and kept, so switching only slides them:
+    // rebuilding a whole screen on every tap is what froze slow smart panels
+    // for ~0.5 s. Rimas (panel mode) is Receive-only: one page, no bottom bar.
+    val appPrefs by settingsViewModel.preferences.collectAsStateWithLifecycle()
+    val panelMode = appPrefs.panelMode
+    val homeTabs = if (panelMode) listOf(HomeTab.RECEIVE) else listOf(HomeTab.SEND, HomeTab.RECEIVE)
+    val pagerState = rememberPagerState(initialPage = 0) { homeTabs.size }
+    // A tab another part of the app asked for (share, deep link, History);
+    // applied by the home route once it is showing.
+    var pendingTab by remember { mutableStateOf<HomeTab?>(null) }
+
+    fun goToTab(tab: HomeTab) {
+        pendingTab = tab
+        val route = navController.currentDestination?.route
+        if (route != null && route != HOME_ROUTE) {
+            navController.popBackStack(HOME_ROUTE, inclusive = false)
+        }
+    }
+
+    val showBottomBar = currentRoute == HOME_ROUTE && !panelMode
 
     var handledSharedContent by rememberSaveable { mutableStateOf(false) }
     if (sharedContent !is SharedContent.None && !handledSharedContent) {
@@ -202,28 +230,18 @@ fun CrocApp(
         when (sharedContent) {
             is SharedContent.Files -> {
                 sendViewModel.addFiles(sharedContent.uris)
-                // Navigate to Send tab so user sees shared files
-                androidx.compose.runtime.LaunchedEffect(Unit) {
-                    navController.navigate(CrocDestination.Send.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
+                // Show the Send tab so the user sees the shared files
+                androidx.compose.runtime.LaunchedEffect(Unit) { goToTab(HomeTab.SEND) }
             }
             is SharedContent.Text -> {
                 sendViewModel.setSharedText(sharedContent.text)
-                // Navigate to Send tab in text mode
+                // Show the Send tab in text mode
+                androidx.compose.runtime.LaunchedEffect(Unit) { goToTab(HomeTab.SEND) }
+            }
+            is SharedContent.SendCode -> {
                 androidx.compose.runtime.LaunchedEffect(Unit) {
-                    navController.navigate(CrocDestination.Send.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                    sendViewModel.useScannedCode(sharedContent.code)
+                    goToTab(HomeTab.SEND)
                 }
             }
             is SharedContent.ReceiveCode -> {
@@ -231,13 +249,7 @@ fun CrocApp(
                 // start receiving, mirroring the QR-scan flow.
                 androidx.compose.runtime.LaunchedEffect(Unit) {
                     receiveViewModel.setCodeFromQr(sharedContent.code)
-                    navController.navigate(CrocDestination.Receive.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                    goToTab(HomeTab.RECEIVE)
                     if (binaryManager.isBinaryReady()) receiveViewModel.startReceive()
                 }
             }
@@ -245,8 +257,8 @@ fun CrocApp(
         }
     }
 
-    // Determine tab indices for directional animations
-    val tabRoutes = CrocDestination.bottomNavItems.map { it.route }
+    // Only "home" is a tab route now; everything else slides in over it.
+    val tabRoutes = listOf(HOME_ROUTE)
 
     val shouldShowSetup = setupState.phase == BinarySetupPhase.Error ||
             (!binaryManager.isBinaryReady() && setupState.phase != BinarySetupPhase.Ready)
@@ -289,17 +301,21 @@ fun CrocApp(
                     tonalElevation = 0.dp,
                     windowInsets = WindowInsets(0, 0, 0, 0)
                 ) {
+                    val shownTab = homeTabs.getOrNull(pagerState.targetPage)
                     CrocDestination.bottomNavItems.forEach { destination ->
-                        val selected = currentRoute == destination.route
+                        val tab = if (destination == CrocDestination.Send) HomeTab.SEND else HomeTab.RECEIVE
+                        val selected = shownTab == tab
                         NavigationBarItem(
                             selected = selected,
                             onClick = {
-                                navController.navigate(destination.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
+                                val index = homeTabs.indexOf(tab)
+                                if (index >= 0) {
+                                    retryScope.launch {
+                                        pagerState.animateScrollToPage(
+                                            index,
+                                            animationSpec = tween(PAGE_MS, easing = PageEasing)
+                                        )
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
                                 }
                             },
                             icon = {
@@ -328,9 +344,13 @@ fun CrocApp(
             }
         }
     ) { paddingValues ->
+        // Smart panels / big tablets: much weaker GPU per pixel, so page
+        // switches there use a plain slide (no card scale/clip, no alpha).
+        val largeScreen = androidx.compose.ui.platform.LocalConfiguration.current.smallestScreenWidthDp >= 600
+        Box(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
-            startDestination = CrocDestination.Quick.route,
+            startDestination = HOME_ROUTE,
             modifier = Modifier.padding(paddingValues),
             // Page-style motion, like swiping between pages of a book:
             //  • tab ↔ tab: both pages slide a full screen width together over
@@ -345,9 +365,11 @@ fun CrocApp(
                 val fromIndex = tabRoutes.indexOf(initialState.destination.route)
                 val toIndex = tabRoutes.indexOf(targetState.destination.route)
                 if (fromIndex >= 0 && toIndex >= 0) {
+                    // Pure slide: an alpha fade makes Android render each whole
+                    // page off-screen every frame, which is the main source of
+                    // jank. The card fill (TabPageCard) already keeps pages solid.
                     val direction = if (toIndex > fromIndex) 1 else -1
-                    slideInHorizontally(pageSpec()) { direction * it } +
-                            fadeIn(pageFloatSpec(), initialAlpha = 0.6f)
+                    slideInHorizontally(pageSpec()) { direction * it }
                 } else {
                     slideInHorizontally(pageSpec()) { it }
                 }
@@ -357,77 +379,92 @@ fun CrocApp(
                 val toIndex = tabRoutes.indexOf(targetState.destination.route)
                 if (fromIndex >= 0 && toIndex >= 0) {
                     val direction = if (toIndex > fromIndex) -1 else 1
-                    slideOutHorizontally(pageSpec()) { direction * it } +
-                            fadeOut(pageFloatSpec(), targetAlpha = 0.6f)
+                    slideOutHorizontally(pageSpec()) { direction * it }
+                } else if (largeScreen) {
+                    slideOutHorizontally(pageSpec()) { -it / 4 }
                 } else {
                     slideOutHorizontally(pageSpec()) { -it / 4 } +
                             fadeOut(pageFloatSpec(), targetAlpha = 0.4f)
                 }
             },
             popEnterTransition = {
-                slideInHorizontally(pageSpec()) { -it / 4 } +
-                        fadeIn(pageFloatSpec(), initialAlpha = 0.4f)
+                if (largeScreen) {
+                    slideInHorizontally(pageSpec()) { -it / 4 }
+                } else {
+                    slideInHorizontally(pageSpec()) { -it / 4 } +
+                            fadeIn(pageFloatSpec(), initialAlpha = 0.4f)
+                }
             },
             popExitTransition = {
                 slideOutHorizontally(pageSpec()) { it }
             }
         ) {
-            composable(CrocDestination.Quick.route) {
-                TabPageCard {
-                QuickScreen(
-                    viewModel = quickViewModel,
-                    onOpenScanner = { onCodeScanned ->
-                        // Store callback and navigate to scanner
-                        navController.navigate("scanner_quick")
-                    },
-                    onNavigateToSettings = {
-                        navController.navigate(CrocDestination.Settings.route)
-                    },
-                    onNavigateToGuide = {
-                        navController.navigate(CrocDestination.Guide.route)
-                    }
-                )
+            composable(HOME_ROUTE) {
+                // Apply a tab requested from elsewhere (share, deep link, History).
+                androidx.compose.runtime.LaunchedEffect(pendingTab, homeTabs) {
+                    val tab = pendingTab ?: return@LaunchedEffect
+                    val index = homeTabs.indexOf(tab)
+                    if (index >= 0) pagerState.scrollToPage(index)
+                    pendingTab = null
                 }
-            }
-            composable(CrocDestination.Send.route) {
-                TabPageCard {
-                SendScreen(
-                    viewModel = sendViewModel,
-                    onNavigateToHistory = {
-                        navController.navigate(CrocDestination.History.route)
-                    },
-                    onNavigateToSettings = {
-                        navController.navigate(CrocDestination.Settings.route)
+                // Leaving Rimas: land on Receive (where the panel was), not Send.
+                var lastPanelMode by remember { mutableStateOf<Boolean?>(null) }
+                androidx.compose.runtime.LaunchedEffect(panelMode) {
+                    if (lastPanelMode == true && !panelMode) {
+                        pagerState.scrollToPage(homeTabs.indexOf(HomeTab.RECEIVE))
                     }
-                )
+                    lastPanelMode = panelMode
                 }
-            }
-            composable(CrocDestination.Receive.route) {
-                TabPageCard {
-                ReceiveScreen(
-                    viewModel = receiveViewModel,
-                    onOpenScanner = {
-                        navController.navigate("scanner")
-                    },
-                    onNavigateToHistory = {
-                        navController.navigate(CrocDestination.History.route)
-                    },
-                    onNavigateToSettings = {
-                        navController.navigate(CrocDestination.Settings.route)
+                // System Back on Receive goes to Send first (as before), then exits.
+                androidx.activity.compose.BackHandler(enabled = !panelMode && pagerState.currentPage != 0) {
+                    retryScope.launch { pagerState.animateScrollToPage(0) }
+                }
+
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize(),
+                    // Keep the other tab built and ready (this is the whole point).
+                    beyondViewportPageCount = 1,
+                    // Swipe between Send and Receive; Rimas has a single page.
+                    userScrollEnabled = !panelMode,
+                    key = { homeTabs.getOrElse(it) { HomeTab.RECEIVE } }
+                ) { page ->
+                    when (homeTabs.getOrElse(page) { HomeTab.RECEIVE }) {
+                        HomeTab.SEND -> SendScreen(
+                            viewModel = sendViewModel,
+                            onNavigateToGuide = {
+                                navController.navigate(CrocDestination.Guide.route)
+                            },
+                            onOpenScanner = {
+                                navController.navigate("scanner_send")
+                            },
+                            onNavigateToHistory = {
+                                navController.navigate(CrocDestination.History.route)
+                            },
+                            onNavigateToSettings = {
+                                navController.navigate(CrocDestination.Settings.route)
+                            }
+                        )
+                        HomeTab.RECEIVE -> ReceiveScreen(
+                            viewModel = receiveViewModel,
+                            onOpenScanner = {
+                                navController.navigate("scanner")
+                            },
+                            onNavigateToHistory = {
+                                navController.navigate(CrocDestination.History.route)
+                            },
+                            onNavigateToSettings = {
+                                navController.navigate(CrocDestination.Settings.route)
+                            }
+                        )
                     }
-                )
                 }
             }
             composable(CrocDestination.History.route) {
                 HistoryScreen(
                     onCodeSelected = { code ->
                         receiveViewModel.setCodeFromQr(code)
-                        navController.navigate(CrocDestination.Receive.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                        }
+                        goToTab(HomeTab.RECEIVE)
                     },
                     onNavigateBack = {
                         navController.popBackStack()
@@ -452,32 +489,23 @@ fun CrocApp(
             composable("scanner") {
                 QrScannerScreen(
                     onCodeScanned = { code ->
+                        // The scanner screen goes back by itself (to Receive) after a
+                        // scan; navigating here as well used to drop the user on Send.
                         receiveViewModel.setCodeFromQr(code)
                         receiveViewModel.startReceive()
-                        navController.navigate(CrocDestination.Receive.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
                     },
                     onNavigateBack = {
                         navController.popBackStack()
                     }
                 )
             }
-            composable("scanner_quick") {
+            composable("scanner_send") {
+                // Scan a panel's QR: fill its code, then the user picks files and sends.
                 QrScannerScreen(
                     onCodeScanned = { code ->
-                        quickViewModel.startReceiveFromQr(code)
-                        navController.navigate(CrocDestination.Quick.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                        // The scanner screen navigates back by itself after a scan;
+                        // popping here too would skip past Send.
+                        sendViewModel.useScannedCode(code)
                     },
                     onNavigateBack = {
                         navController.popBackStack()
@@ -485,8 +513,16 @@ fun CrocApp(
                 )
             }
         }
+        // Timer for the "Meko / Rimas is summoned" label shown beside the mode dot.
+        com.dking.crocapp.ui.components.ModeCalloutHost()
+        }
     }
 }
+
+// ── Home: Send + Receive pager ─────────────────────────────────
+private const val HOME_ROUTE = "home"
+
+private enum class HomeTab { SEND, RECEIVE }
 
 // ── Page motion ─────────────────────────────────────────────────
 // Material 3 "emphasized" curve: quick start, long gentle landing.
@@ -514,7 +550,16 @@ private val NavPillShape = RoundedCornerShape(32.dp)
  */
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
-private fun AnimatedVisibilityScope.TabPageCard(content: @Composable () -> Unit) {
+private fun AnimatedVisibilityScope.TabPageCard(
+    simple: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    if (simple) {
+        // Large screens: just the slide. Scaling + rounded clipping a whole
+        // panel-sized page every frame is what drops frames there.
+        Box(modifier = Modifier.fillMaxSize()) { content() }
+        return
+    }
     // 0 = settled page, 1 = fully a card (off-screen / just starting to move).
     val cardness = transition.animateFloat(
         transitionSpec = { tween(PAGE_MS, easing = PageEasing) },

@@ -3,10 +3,8 @@ package com.dking.crocapp.ui.navigation
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.FlashOn
 import androidx.compose.material.icons.outlined.Upload
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.dking.crocapp.R
@@ -17,13 +15,6 @@ sealed class CrocDestination(
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector
 ) {
-    data object Quick : CrocDestination(
-        route = "quick",
-        labelRes = R.string.nav_quick,
-        selectedIcon = Icons.Filled.FlashOn,
-        unselectedIcon = Icons.Outlined.FlashOn
-    )
-
     data object Send : CrocDestination(
         route = "send",
         labelRes = R.string.nav_send,
@@ -60,7 +51,7 @@ sealed class CrocDestination(
     )
 
     companion object {
-        /** Send, Quick, Receive appear in the bottom navigation */
-        val bottomNavItems = listOf(Send, Quick, Receive)
+        /** Send and Receive appear in the bottom navigation */
+        val bottomNavItems = listOf(Send, Receive)
     }
 }

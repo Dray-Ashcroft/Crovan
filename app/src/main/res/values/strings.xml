@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Kroc-Sauria</string>
+    <string name="app_name">Crovan</string>
 
     <!-- ════ Common / General ════ -->
     <string name="action_cancel">Cancel</string>
@@ -535,4 +535,34 @@
     <string name="receive_input_code_dialog_title">Enter Secret Code</string>
     <string name="receive_input_code_dialog_desc">Enter the secret code phrase from the sender to start receiving.</string>
     <string name="receive_input_code_save_default">Save as default code phrase</string>
+
+    <!-- Panel mode (smart panels / tablets) -->
+    <string name="panel_title">Scan to send</string>
+    <string name="panel_subtitle">On your phone: Send → Scan QR → pick a file</string>
+    <string name="panel_code_label">Code</string>
+    <string name="panel_waiting">Waiting for a sender…</string>
+    <string name="panel_connecting">Getting a new code…</string>
+    <string name="panel_received">Received!</string>
+    <string name="panel_reconnecting">Connection lost. Getting a new code…</string>
+    <string name="panel_new_code_in">New code in %1$d min</string>
+    <string name="panel_new_code_now">New code</string>
+    <string name="panel_last_received">Last received</string>
+    <string name="send_scan_qr">Scan QR</string>
+    <string name="send_scan_panel_qr">Scan panel QR</string>
+    <string name="send_tap_to_pick_files">Tap to pick files</string>
+    <string name="send_tap_to_pick_folder">Tap to pick a folder</string>
+    <string name="send_pick_hint">Photos, videos, documents — anything</string>
+    <string name="send_delivery_direct">Direct</string>
+    <string name="send_delivery_store">Store</string>
+    <string name="action_more_options">More options</string>
+    <string name="receive_scan_sender_qr">Scan sender\'s QR</string>
+    <string name="receive_or_type">or type the code</string>
+    <string name="receive_hint">Ask the sender for their code or QR to begin</string>
+    <string name="receive_clear_all">Clear</string>
+    <string name="mode_meko">Meko</string>
+    <string name="mode_rimas">Rimas</string>
+    <string name="mode_dot_a11y">Mode: %1$s. Hold to switch.</string>
+    <string name="mode_summoned_meko">🐊 Meko is summoned</string>
+    <string name="mode_summoned_rimas">🐊 Rimas is summoned</string>
+    <string name="settings_header_mode">Crovan : %1$s Mode</string>
 </resources>

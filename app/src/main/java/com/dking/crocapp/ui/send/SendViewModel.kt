@@ -16,6 +16,7 @@ import com.dking.crocapp.data.db.TransferHistory
 import com.dking.crocapp.data.db.TransferStatus
 import com.dking.crocapp.data.db.TransferType
 import com.dking.crocapp.data.preferences.UserPreferencesRepository
+import com.dking.crocapp.util.QrCodeParser
 import com.dking.crocapp.util.StorageCleaner
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -241,6 +242,17 @@ class SendViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun useCodePhrase(code: String) {
+        _uiState.update { it.copy(codePhrase = normalizeCodePhrase(code)) }
+    }
+
+    /**
+     * Code scanned from a panel's QR. The panel is the receiver, so this is a
+     * direct (not stored) send; switch to Direct if Store was selected.
+     */
+    fun useScannedCode(raw: String) {
+        val code = QrCodeParser.parseCode(raw)
+        if (code.isBlank()) return
+        setDeliveryMode(DeliveryMode.DIRECT)
         _uiState.update { it.copy(codePhrase = normalizeCodePhrase(code)) }
     }
 

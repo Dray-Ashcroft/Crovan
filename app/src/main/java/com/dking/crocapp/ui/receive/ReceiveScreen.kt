@@ -40,6 +40,8 @@ import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.QrCodeScanner
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Share
@@ -55,6 +57,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
@@ -107,9 +110,21 @@ fun ReceiveScreen(
     onNavigateToSettings: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // Smart-panel mode: a big self-refreshing QR instead of the code form.
+    if (uiState.panelMode) {
+        PanelReceiveScreen(
+            viewModel = viewModel,
+            onNavigateToHistory = onNavigateToHistory,
+            onNavigateToSettings = onNavigateToSettings
+        )
+        return
+    }
+
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
-    var hideCodePhrase by remember { mutableStateOf(true) }
+    var hideCodePhrase by remember { mutableStateOf(false) }
+    var showCodeMenu by remember { mutableStateOf(false) }
     var showAllFiles by remember { mutableStateOf(false) }
     val codeFocusRequester = remember { FocusRequester() }
     var highlightCodeInput by remember { mutableStateOf(false) }
@@ -168,10 +183,13 @@ fun ReceiveScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        stringResource(R.string.nav_receive),
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(R.string.nav_receive),
+                            fontWeight = FontWeight.Bold
+                        )
+                        com.dking.crocapp.ui.components.ModeDot(modifier = Modifier.padding(start = 4.dp))
+                    }
                 },
                 actions = {
                     IconButton(onClick = onNavigateToHistory) {
@@ -187,9 +205,15 @@ fun ReceiveScreen(
                 )
             )
         },
-        floatingActionButton = {
+        bottomBar = {
+            // ③ Full-width main action (same behaviour as the old floating button:
+            // with no code yet it points you to the code field).
             if (!isTransferActive) {
-                ExtendedFloatingActionButton(
+                com.dking.crocapp.ui.components.PrimaryActionBar(
+                    text = fabLabel,
+                    icon = if (isLegacyFallback) Icons.Rounded.History else Icons.Rounded.Download,
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                     onClick = {
                         if (isLegacyFallback) {
                             viewModel.retryWithLegacy()
@@ -204,20 +228,7 @@ fun ReceiveScreen(
                                 viewModel.startReceive()
                             }
                         }
-                    },
-                    icon = {
-                        Icon(
-                            if (isLegacyFallback) Icons.Rounded.History else Icons.Rounded.Download,
-                            contentDescription = null
-                        )
-                    },
-                    text = { Text(fabLabel, fontWeight = FontWeight.SemiBold) },
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                    elevation = FloatingActionButtonDefaults.elevation(
-                        defaultElevation = 3.dp
-                    ),
-                    expanded = canReceive || isLegacyFallback
+                    }
                 )
             }
         }
@@ -260,34 +271,77 @@ fun ReceiveScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    com.dking.crocapp.ui.components.StepTitle(
+                        number = 1,
+                        title = stringResource(R.string.send_secret_code)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
+                        if (uiState.defaultCodePhrase.isNotBlank() && uiState.defaultCodePhrase == uiState.codePhrase) {
                             Text(
-                                text = "Secret Code",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold
+                                text = stringResource(R.string.label_default),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.tertiary
                             )
-                            if (uiState.defaultCodePhrase.isNotBlank() && uiState.defaultCodePhrase == uiState.codePhrase) {
-                                Text(
-                                    text = "Default",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.tertiary
-                                )
-                            }
                         }
                         EngineBadge(
                             engine = uiState.activeEngine,
                             onClick = if (!isTransferActive) { { viewModel.toggleEngine() } } else null,
                             showCurrentMode = true
                         )
+                        Box {
+                            IconButton(onClick = { showCodeMenu = true }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.action_more_options))
+                            }
+                            androidx.compose.material3.DropdownMenu(
+                                expanded = showCodeMenu,
+                                onDismissRequest = { showCodeMenu = false }
+                            ) {
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.action_save)) },
+                                    enabled = !isTransferActive && uiState.codePhrase.isNotBlank(),
+                                    onClick = { showCodeMenu = false; viewModel.saveCurrentCode() },
+                                    leadingIcon = { Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                )
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.receive_clear_all)) },
+                                    enabled = !isTransferActive && (uiState.codePhrase.isNotBlank() || uiState.receivedFiles.isNotEmpty()),
+                                    onClick = { showCodeMenu = false; viewModel.resetTransfer() },
+                                    leadingIcon = { Icon(Icons.Rounded.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                )
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(if (hideCodePhrase) stringResource(R.string.receive_show_code) else stringResource(R.string.receive_hide_code)) },
+                                    onClick = { showCodeMenu = false; hideCodePhrase = !hideCodePhrase },
+                                    leadingIcon = {
+                                        Icon(
+                                            if (hideCodePhrase) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                )
+                            }
+                        }
                     }
+
+                    // The easy way first: scan the sender's QR.
+                    FilledTonalButton(
+                        onClick = onOpenScanner,
+                        enabled = !isTransferActive,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = MaterialTheme.shapes.large
+                    ) {
+                        Icon(Icons.Rounded.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.receive_scan_sender_qr), fontWeight = FontWeight.SemiBold)
+                    }
+                    Text(
+                        text = stringResource(R.string.receive_or_type),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
                     OutlinedTextField(
                         value = uiState.codePhrase,
@@ -303,58 +357,82 @@ fun ReceiveScreen(
                         singleLine = true,
                         placeholder = { Text(stringResource(R.string.receive_code_placeholder)) },
                         shape = MaterialTheme.shapes.large,
+                        textStyle = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontWeight = FontWeight.SemiBold
+                        ),
                         visualTransformation = if (hideCodePhrase) PasswordVisualTransformation() else VisualTransformation.None,
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
                         trailingIcon = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = { hideCodePhrase = !hideCodePhrase }) {
-                                    Icon(
-                                        imageVector = if (hideCodePhrase) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
-                                        contentDescription = if (hideCodePhrase) stringResource(R.string.receive_show_code) else stringResource(R.string.receive_hide_code)
-                                    )
-                                }
                                 IconButton(onClick = {
                                     val clip = clipboardManager.getText()?.text ?: ""
                                     viewModel.updateCodePhrase(clip)
                                 }) {
                                     Icon(Icons.Rounded.ContentPaste, contentDescription = stringResource(R.string.receive_paste))
                                 }
+                                if (uiState.codePhrase.isNotBlank() && !isTransferActive) {
+                                    IconButton(onClick = { viewModel.updateCodePhrase("") }) {
+                                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.action_clear))
+                                    }
+                                }
                             }
                         }
                     )
 
-                    // Action chips
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                        maxLines = 2
-                    ) {
-                        AssistChip(
-                            onClick = onOpenScanner,
-                            enabled = !isTransferActive,
-                            label = { Text(stringResource(R.string.action_scan_qr)) },
-                            leadingIcon = {
-                                Icon(Icons.Rounded.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
+                    // Saved codes — scrollable 2-row horizontal grid
+                    if (uiState.savedCodePhrases.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            uiState.savedCodePhrases.chunked(2).forEach { column ->
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    column.forEach { savedCode ->
+                                        SavedCodeChipWithActions(
+                                            code = savedCode,
+                                            enabled = !isTransferActive,
+                                            onUse = { viewModel.startReceiveWithCode(savedCode) },
+                                            onCopy = {
+                                                clipboardManager.setText(
+                                                    androidx.compose.ui.text.AnnotatedString(savedCode)
+                                                )
+                                            },
+                                            onShare = {
+                                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                    type = "text/plain"
+                                                    putExtra(android.content.Intent.EXTRA_TEXT, savedCode)
+                                                    putExtra(android.content.Intent.EXTRA_SUBJECT, "croc code")
+                                                }
+                                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Share code"))
+                                            }
+                                        )
+                                    }
+                                }
                             }
-                        )
-                        AssistChip(
-                            onClick = { viewModel.saveCurrentCode() },
-                            enabled = !isTransferActive && uiState.codePhrase.isNotBlank(),
-                            label = { Text(stringResource(R.string.action_save)) },
-                            leadingIcon = {
-                                Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                            }
-                        )
-                        AssistChip(
-                            onClick = { viewModel.resetTransfer() },
-                            enabled = !isTransferActive && (uiState.codePhrase.isNotBlank() || uiState.receivedFiles.isNotEmpty()),
-                            label = { Text(stringResource(R.string.action_clear)) },
-                            leadingIcon = {
-                                Icon(Icons.Rounded.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
-                            }
-                        )
+                        }
                     }
+                }
+            }
 
+            // ──── ② Where files are saved ────
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                ),
+                shape = MaterialTheme.shapes.extraLarge
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    com.dking.crocapp.ui.components.StepTitle(
+                        number = 2,
+                        title = stringResource(R.string.receive_save_to)
+                    )
                     // ── Save location row ──
                     Row(
                         modifier = Modifier
@@ -412,40 +490,25 @@ fun ReceiveScreen(
                         }
                     }
 
-                    // Saved codes — scrollable 2-row horizontal grid
-                    if (uiState.savedCodePhrases.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            uiState.savedCodePhrases.chunked(2).forEach { column ->
-                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    column.forEach { savedCode ->
-                                        SavedCodeChipWithActions(
-                                            code = savedCode,
-                                            enabled = !isTransferActive,
-                                            onUse = { viewModel.startReceiveWithCode(savedCode) },
-                                            onCopy = {
-                                                clipboardManager.setText(
-                                                    androidx.compose.ui.text.AnnotatedString(savedCode)
-                                                )
-                                            },
-                                            onShare = {
-                                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                                    type = "text/plain"
-                                                    putExtra(android.content.Intent.EXTRA_TEXT, savedCode)
-                                                    putExtra(android.content.Intent.EXTRA_SUBJECT, "croc code")
-                                                }
-                                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Share code"))
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                }
+            }
+
+            // Friendly hint while nothing is happening yet
+            if (uiState.transferState is CrocTransferState.Idle && uiState.receivedFiles.isEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 18.dp, horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "🐊", style = MaterialTheme.typography.headlineSmall)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = stringResource(R.string.receive_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
@@ -614,14 +677,13 @@ fun ReceiveScreen(
                 }
             }
 
-            // Bottom padding for FAB clearance
-            Spacer(modifier = Modifier.height(80.dp))
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
 
 @Composable
-private fun ReceivedFileRow(
+internal fun ReceivedFileRow(
     file: ReceivedFile,
     onOpen: () -> Unit,
     onShare: () -> Unit
